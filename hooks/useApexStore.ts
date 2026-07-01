@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { db, defaultSettings, ensureSettings } from "@/lib/db";
 import { dateKey } from "@/lib/date";
 import { buildStockAlerts, summarizeProductStock } from "@/lib/stock";
-import type { ApexAlert, AppSettings, NutritionLog, Product, ProductConsumption, ProgressPhoto, TaskCompletion, Workout } from "@/types/apex";
+import { buildShoppingSuggestions } from "@/lib/shopping";
+import { answerLocalChat } from "@/lib/chat";
+import type { ApexAlert, AppSettings, BodyMeasurement, ChatMessage, NutritionLog, Product, ProductConsumption, ProgressPhoto, ShoppingItem, TaskCompletion, Workout } from "@/types/apex";
 
 export function useApexStore(selectedDate: Date) {
   const selectedDateKey = useMemo(() => dateKey(selectedDate), [selectedDate]);
@@ -15,18 +17,24 @@ export function useApexStore(selectedDate: Date) {
   const [alerts, setAlerts] = useState<ApexAlert[]>([]);
   const [nutritionLogs, setNutritionLogs] = useState<NutritionLog[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [bodyMeasurements, setBodyMeasurements] = useState<BodyMeasurement[]>([]);
+  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(defaultSettings);
   const [ready, setReady] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [nextCompletions, nextProducts, nextConsumptions, nextAlerts, nextNutritionLogs, nextWorkouts, nextPhotos, nextSettings] = await Promise.all([
+    const [nextCompletions, nextProducts, nextConsumptions, nextAlerts, nextNutritionLogs, nextWorkouts, nextBody, nextShopping, nextChat, nextPhotos, nextSettings] = await Promise.all([
       db.completions.where("dateKey").equals(selectedDateKey).toArray(),
       db.products.orderBy("purchaseDate").reverse().toArray(),
       db.productConsumptions.orderBy("createdAt").reverse().toArray(),
       db.alerts.orderBy("createdAt").reverse().toArray(),
       db.nutritionLogs.orderBy("dateKey").reverse().toArray(),
       db.workouts.orderBy("createdAt").reverse().toArray(),
+      db.bodyMeasurements.orderBy("createdAt").reverse().toArray(),
+      db.shoppingItems.orderBy("createdAt").reverse().toArray(),
+      db.chatMessages.orderBy("createdAt").toArray(),
       db.photos.orderBy("createdAt").reverse().toArray(),
       ensureSettings()
     ]);
@@ -37,6 +45,9 @@ export function useApexStore(selectedDate: Date) {
     setAlerts(nextAlerts);
     setNutritionLogs(nextNutritionLogs);
     setWorkouts(nextWorkouts);
+    setBodyMeasurements(nextBody);
+    setShoppingItems(nextShopping);
+    setChatMessages(nextChat);
     setPhotos(nextPhotos);
     setSettingsState(nextSettings);
     setReady(true);
@@ -56,6 +67,7 @@ export function useApexStore(selectedDate: Date) {
     () => workouts.filter((workout) => workout.dateKey === selectedDateKey),
     [selectedDateKey, workouts]
   );
+  const latestBody = useMemo(() => bodyMeasurements[0], [bodyMeasurements]);
 
   useEffect(() => {
     void refresh();
@@ -95,7 +107,7 @@ export function useApexStore(selectedDate: Date) {
   const addProduct = useCallback(
     async (product: Omit<Product, "id" | "createdAt">) => {
       const initialStock = product.initialStock ?? product.size ?? product.quantity;
-      await db.products.add({ ...product, initialStock, size: product.size ?? initialStock, quantity: initialStock, createdAt: new Date().toISOString() });
+      await db.products.add({ ...product, group: product.group, initialStock, size: product.size ?? initialStock, quantity: initialStock, createdAt: new Date().toISOString() });
       await refresh();
     },
     [refresh]
@@ -139,13 +151,14 @@ export function useApexStore(selectedDate: Date) {
   }, [refresh, stockSummaries]);
 
   const upsertNutritionLog = useCallback(
-    async (values: Omit<NutritionLog, "id" | "dateKey" | "createdAt" | "updatedAt">) => {
-      const existing = await db.nutritionLogs.where("dateKey").equals(selectedDateKey).first();
+    async (values: Omit<NutritionLog, "id" | "createdAt" | "updatedAt">) => {
+      const targetDateKey = values.dateKey ?? selectedDateKey;
+      const existing = await db.nutritionLogs.where("dateKey").equals(targetDateKey).first();
       const now = new Date().toISOString();
       if (existing?.id) {
         await db.nutritionLogs.update(existing.id, { ...values, updatedAt: now });
       } else {
-        await db.nutritionLogs.add({ ...values, dateKey: selectedDateKey, createdAt: now, updatedAt: now });
+        await db.nutritionLogs.add({ ...values, dateKey: targetDateKey, createdAt: now, updatedAt: now });
       }
       await refresh();
     },
@@ -159,6 +172,58 @@ export function useApexStore(selectedDate: Date) {
     },
     [refresh, selectedDateKey]
   );
+
+  const updateWorkout = useCallback(async (id: number, workout: Partial<Workout>) => {
+    await db.workouts.update(id, workout);
+    await refresh();
+  }, [refresh]);
+
+  const deleteWorkout = useCallback(async (id: number) => {
+    await db.workouts.delete(id);
+    await refresh();
+  }, [refresh]);
+
+  const duplicateWorkout = useCallback(async (workout: Workout) => {
+    const { id: _id, createdAt: _createdAt, ...copy } = workout;
+    await db.workouts.add({ ...copy, dateKey: selectedDateKey, title: `${workout.title} copia`, createdAt: new Date().toISOString() });
+    await refresh();
+  }, [refresh, selectedDateKey]);
+
+  const deleteNutritionLog = useCallback(async (id: number) => {
+    await db.nutritionLogs.delete(id);
+    await refresh();
+  }, [refresh]);
+
+  const duplicateNutritionLog = useCallback(async (log: NutritionLog) => {
+    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...copy } = log;
+    const now = new Date().toISOString();
+    await db.nutritionLogs.add({ ...copy, dateKey: selectedDateKey, createdAt: now, updatedAt: now });
+    await refresh();
+  }, [refresh, selectedDateKey]);
+
+  const addBodyMeasurement = useCallback(async (measurement: Omit<BodyMeasurement, "id" | "dateKey" | "createdAt">) => {
+    await db.bodyMeasurements.add({ ...measurement, dateKey: selectedDateKey, createdAt: new Date().toISOString() });
+    await refresh();
+  }, [refresh, selectedDateKey]);
+
+  const syncShoppingList = useCallback(async () => {
+    const existing = await db.shoppingItems.toArray();
+    const suggestions = buildShoppingSuggestions(stockSummaries, existing);
+    if (suggestions.length) await db.shoppingItems.bulkAdd(suggestions);
+    await refresh();
+  }, [refresh, stockSummaries]);
+
+  const updateShoppingStatus = useCallback(async (id: number, status: ShoppingItem["status"]) => {
+    await db.shoppingItems.update(id, { status, updatedAt: new Date().toISOString() });
+    await refresh();
+  }, [refresh]);
+
+  const sendChatMessage = useCallback(async (content: string) => {
+    await db.chatMessages.add({ role: "user", content, createdAt: new Date().toISOString() });
+    const answer = answerLocalChat(content, { nutrition: selectedNutrition, stock: stockSummaries, workouts, body: latestBody });
+    await db.chatMessages.add({ role: "assistant", content: answer, createdAt: new Date().toISOString() });
+    await refresh();
+  }, [latestBody, refresh, selectedNutrition, stockSummaries, workouts]);
 
   const addPhoto = useCallback(
     async (photo: Omit<ProgressPhoto, "id" | "createdAt">) => {
@@ -186,6 +251,9 @@ export function useApexStore(selectedDate: Date) {
       alerts: await db.alerts.toArray(),
       nutritionLogs: await db.nutritionLogs.toArray(),
       workouts: await db.workouts.toArray(),
+      bodyMeasurements: await db.bodyMeasurements.toArray(),
+      shoppingItems: await db.shoppingItems.toArray(),
+      chatMessages: await db.chatMessages.toArray(),
       photos: await db.photos.toArray(),
       settings: await db.settings.toArray()
     };
@@ -204,6 +272,10 @@ export function useApexStore(selectedDate: Date) {
     selectedNutrition,
     workouts,
     selectedWorkouts,
+    bodyMeasurements,
+    latestBody,
+    shoppingItems,
+    chatMessages,
     photos,
     settings,
     isDone,
@@ -215,6 +287,15 @@ export function useApexStore(selectedDate: Date) {
     syncStockAlerts,
     upsertNutritionLog,
     addWorkout,
+    updateWorkout,
+    deleteWorkout,
+    duplicateWorkout,
+    deleteNutritionLog,
+    duplicateNutritionLog,
+    addBodyMeasurement,
+    syncShoppingList,
+    updateShoppingStatus,
+    sendChatMessage,
     addPhoto,
     updateSettings,
     exportData,

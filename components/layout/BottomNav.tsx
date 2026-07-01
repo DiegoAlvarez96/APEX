@@ -1,19 +1,23 @@
 "use client";
 
-import { BarChart3, Bell, Bot, CalendarDays, Dumbbell, Home, ListChecks, Package, Settings, Sparkles, Utensils } from "lucide-react";
+import { BarChart3, Bell, Bot, CalendarDays, Dumbbell, HeartPulse, Home, ListChecks, Package, Settings, ShoppingCart, Sparkles, UserRound, Utensils } from "lucide-react";
 
-export type ViewKey = "dashboard" | "calendar" | "nutrition" | "training" | "care" | "products" | "alerts" | "timeline" | "ai" | "stats" | "settings";
+export type ViewKey = "dashboard" | "calendar" | "nutrition" | "training" | "physical" | "health" | "care" | "products" | "shopping" | "alerts" | "timeline" | "ai" | "chat" | "stats" | "settings";
 
 const items = [
   { key: "dashboard", label: "Hoy", icon: Home },
   { key: "calendar", label: "Agenda", icon: CalendarDays },
   { key: "nutrition", label: "Nutri", icon: Utensils },
   { key: "training", label: "Train", icon: Dumbbell },
+  { key: "physical", label: "Fisico", icon: UserRound },
+  { key: "health", label: "Salud", icon: HeartPulse },
   { key: "care", label: "Care", icon: Sparkles },
   { key: "products", label: "Stock", icon: Package },
+  { key: "shopping", label: "Compras", icon: ShoppingCart },
   { key: "alerts", label: "Alertas", icon: Bell },
   { key: "timeline", label: "Linea", icon: ListChecks },
   { key: "ai", label: "IA", icon: Bot },
+  { key: "chat", label: "Chat", icon: Bot },
   { key: "stats", label: "Stats", icon: BarChart3 },
   { key: "settings", label: "Config", icon: Settings }
 ] satisfies { key: ViewKey; label: string; icon: typeof Home }[];

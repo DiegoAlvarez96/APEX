@@ -7,8 +7,9 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { dateKey, formatDateKey } from "@/lib/date";
+import { productSuggestions } from "@/lib/shopping";
 import { formatAmount, productDisplayName, stockColor } from "@/lib/stock";
-import type { Product, ProductStockSummary } from "@/types/apex";
+import type { Product, ProductGroup, ProductStockSummary } from "@/types/apex";
 
 const productSchema = z.object({
   name: z.string().min(2),
@@ -35,13 +36,14 @@ export function ProductsSmartView({
   onAddConsumption: (productId: number, amount: number, note?: string) => void;
 }) {
   const [image, setImage] = useState<string>();
+  const [group, setGroup] = useState<ProductGroup>("nutrition");
   const { register, handleSubmit, reset } = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
     defaultValues: { unit: "g", purchaseDate: dateKey(), lowAt: 20, cost: 0, initialStock: 100, size: 100 }
   });
 
   function submit(values: ProductForm) {
-    onAddProduct({ ...values, image, quantity: values.initialStock });
+    onAddProduct({ ...values, group, image, quantity: values.initialStock });
     setImage(undefined);
     reset();
   }
@@ -73,6 +75,19 @@ export function ProductsSmartView({
             <input className="hidden" type="file" accept="image/*" onChange={(event) => void handleImage(event.target.files?.[0] ?? null)} />
           </label>
           <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" placeholder="Nombre comercial" {...register("commercialName")} />
+          <select className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={group} onChange={(event) => setGroup(event.target.value as ProductGroup)}>
+            <option value="nutrition">Alimentacion</option>
+            <option value="personalCare">Cuidado personal</option>
+            <option value="supplement">Suplementos</option>
+            <option value="other">Otros</option>
+          </select>
+          <div className="no-scrollbar flex gap-2 overflow-x-auto">
+            {productSuggestions[group].map((suggestion) => (
+              <button key={suggestion} className="shrink-0 rounded-full bg-white/[0.08] px-3 py-2 text-xs light:bg-black/[0.05]" type="button">
+                {suggestion}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" placeholder="Producto" {...register("name")} />
             <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" placeholder="Marca" {...register("brand")} />

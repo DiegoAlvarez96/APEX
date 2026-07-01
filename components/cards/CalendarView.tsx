@@ -4,19 +4,26 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { addDays, dateKey, dayOfMonth, monthStart, monthTitle, weekdayInAppTimeZone } from "@/lib/date";
+import { buildAgendaDetail } from "@/lib/agenda";
 import { getRoutineForDate } from "@/lib/routines";
+import type { ProductStockSummary, Workout } from "@/types/apex";
 
 export function CalendarView({
   selectedDate,
   onSelectDate,
   mode,
-  onModeChange
+  onModeChange,
+  workouts,
+  stockSummaries
 }: {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   mode: "week" | "month";
   onModeChange: (mode: "week" | "month") => void;
+  workouts: Workout[];
+  stockSummaries: ProductStockSummary[];
 }) {
+  const detail = buildAgendaDetail(selectedDate, workouts.filter((workout) => workout.dateKey === dateKey(selectedDate)), stockSummaries);
   const days =
     mode === "week"
       ? Array.from({ length: 7 }, (_, index) => addDays(selectedDate, index - weekdayInAppTimeZone(selectedDate)))
@@ -71,6 +78,30 @@ export function CalendarView({
           })}
         </div>
       </Card>
+
+      <Card>
+        <SectionTitle title={`Detalle ${dayOfMonth(selectedDate)}`} eyebrow="Agenda del dia" />
+        <AgendaBlock title="Rutina" items={detail.routine} />
+        <AgendaBlock title="Skincare manana" items={detail.morning} />
+        <AgendaBlock title="Skincare noche" items={detail.night} />
+        <AgendaBlock title="Suplementos" items={detail.supplements} />
+        <AgendaBlock title="Habitos" items={detail.habits} />
+        <AgendaBlock title="Notas" items={detail.notes} />
+      </Card>
+    </div>
+  );
+}
+
+function AgendaBlock({ title, items }: { title: string; items: string[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="mb-4 last:mb-0">
+      <p className="mb-2 text-sm font-semibold">{title}</p>
+      <div className="space-y-2">
+        {items.map((item) => (
+          <div key={`${title}-${item}`} className="rounded-2xl bg-white/[0.06] px-3 py-2 text-sm light:bg-black/[0.04]">{item}</div>
+        ))}
+      </div>
     </div>
   );
 }

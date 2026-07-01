@@ -3,6 +3,8 @@ export type ProgressPhotoZone = "skin" | "beard" | "hair";
 export type ThemeMode = "dark" | "light";
 export type AlertStatus = "active" | "buy" | "snoozed" | "ignored";
 export type AlertSeverity = "info" | "warning" | "critical";
+export type ProductGroup = "nutrition" | "personalCare" | "supplement" | "other";
+export type ShoppingStatus = "pending" | "bought" | "ignored";
 
 export type RoutineTask = {
   id: string;
@@ -34,6 +36,7 @@ export type Product = {
   brandLogo?: string;
   image?: string;
   category: string;
+  group?: ProductGroup;
   quantity: number;
   initialStock?: number;
   size?: number;
@@ -86,10 +89,25 @@ export type NutritionLog = {
   protein: number;
   carbs: number;
   fat: number;
+  fiber?: number;
   waterMl: number;
   weightKg?: number;
+  meals?: FoodEntry[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type FoodEntry = {
+  id: string;
+  name: string;
+  amountLabel?: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  estimated: boolean;
+  source: "text" | "autocomplete" | "photo";
 };
 
 export type WorkoutSet = {
@@ -113,6 +131,41 @@ export type Workout = {
   durationMinutes?: number;
   exercises: WorkoutExercise[];
   notes?: string;
+  createdAt: string;
+};
+
+export type BodyMeasurement = {
+  id?: number;
+  dateKey: string;
+  weightKg: number;
+  heightCm?: number;
+  age?: number;
+  goal: string;
+  bodyFatPercent?: number;
+  chestCm?: number;
+  waistCm?: number;
+  armsCm?: number;
+  legsCm?: number;
+  neckCm?: number;
+  photo?: string;
+  createdAt: string;
+};
+
+export type ShoppingItem = {
+  id?: number;
+  title: string;
+  category: ProductGroup;
+  status: ShoppingStatus;
+  source: "stock" | "ai" | "manual";
+  productId?: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ChatMessage = {
+  id?: number;
+  role: "user" | "assistant";
+  content: string;
   createdAt: string;
 };
 

@@ -6,13 +6,17 @@ import { Dashboard } from "@/components/cards/Dashboard";
 import { AlertsView } from "@/components/cards/AlertsView";
 import { CalendarView } from "@/components/cards/CalendarView";
 import { CareView } from "@/components/cards/CareView";
+import { ChatAiView } from "@/components/cards/ChatAiView";
+import { HealthAestheticView } from "@/components/cards/HealthAestheticView";
 import { InsightsView } from "@/components/cards/InsightsView";
-import { NutritionView } from "@/components/cards/NutritionView";
+import { NutritionSmartView } from "@/components/cards/NutritionSmartView";
+import { PhysicalView } from "@/components/cards/PhysicalView";
 import { ProductsSmartView } from "@/components/cards/ProductsSmartView";
 import { SettingsView } from "@/components/cards/SettingsView";
+import { ShoppingView } from "@/components/cards/ShoppingView";
 import { StatsView } from "@/components/cards/StatsView";
 import { TimelineView } from "@/components/cards/TimelineView";
-import { TrainingView } from "@/components/cards/TrainingView";
+import { TrainingSmartView } from "@/components/cards/TrainingSmartView";
 import { BottomNav, type ViewKey } from "@/components/layout/BottomNav";
 import { useApexStore } from "@/hooks/useApexStore";
 import { buildTimeline } from "@/lib/timeline";
@@ -43,9 +47,11 @@ export default function Home() {
         stockSummaries={store.stockSummaries}
       />
     ),
-    calendar: <CalendarView selectedDate={selectedDate} onSelectDate={setSelectedDate} mode={calendarMode} onModeChange={setCalendarMode} />,
-    nutrition: <NutritionView nutrition={store.selectedNutrition} onSave={(values) => void store.upsertNutritionLog(values)} />,
-    training: <TrainingView workouts={store.workouts} onAddWorkout={(workout) => void store.addWorkout(workout)} />,
+    calendar: <CalendarView selectedDate={selectedDate} onSelectDate={setSelectedDate} mode={calendarMode} onModeChange={setCalendarMode} workouts={store.workouts} stockSummaries={store.stockSummaries} />,
+    nutrition: <NutritionSmartView nutrition={store.selectedNutrition} onSave={(values) => void store.upsertNutritionLog(values)} onDelete={(id) => void store.deleteNutritionLog(id)} onDuplicate={(log) => void store.duplicateNutritionLog(log)} />,
+    training: <TrainingSmartView workouts={store.workouts} onAddWorkout={(workout) => void store.addWorkout(workout)} onUpdateWorkout={(id, workout) => void store.updateWorkout(id, workout)} onDeleteWorkout={(id) => void store.deleteWorkout(id)} onDuplicateWorkout={(workout) => void store.duplicateWorkout(workout)} />,
+    physical: <PhysicalView latest={store.latestBody} measurements={store.bodyMeasurements} onSave={(value) => void store.addBodyMeasurement(value)} />,
+    health: <HealthAestheticView />,
     care: <CareView photos={store.photos} onAddPhoto={(photo) => void store.addPhoto(photo)} />,
     products: (
       <ProductsSmartView
@@ -54,9 +60,11 @@ export default function Home() {
         onAddConsumption={(id, amount, note) => void store.addProductConsumption(id, amount, note)}
       />
     ),
+    shopping: <ShoppingView items={store.shoppingItems} onSync={() => void store.syncShoppingList()} onUpdate={(id, status) => void store.updateShoppingStatus(id, status)} />,
     alerts: <AlertsView alerts={store.alerts} onSyncStockAlerts={() => void store.syncStockAlerts()} onUpdateStatus={(id, status) => void store.updateAlertStatus(id, status)} />,
     timeline: <TimelineView events={timeline} />,
     ai: <InsightsView settings={store.settings} nutrition={store.selectedNutrition} stock={store.stockSummaries} workouts={store.workouts} habitsCompleted={habitsCompleted} />,
+    chat: <ChatAiView messages={store.chatMessages} onSend={(content) => void store.sendChatMessage(content)} />,
     stats: <StatsView completions={store.allCompletions} />,
     settings: <SettingsView settings={store.settings} onUpdateSettings={(settings) => void store.updateSettings(settings)} onExport={store.exportData} />
   }[view];

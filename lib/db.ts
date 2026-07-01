@@ -1,7 +1,7 @@
 "use client";
 
 import Dexie, { type Table } from "dexie";
-import type { ApexAlert, AppSettings, NutritionLog, Product, ProductConsumption, ProgressPhoto, TaskCompletion, Workout } from "@/types/apex";
+import type { ApexAlert, AppSettings, BodyMeasurement, ChatMessage, NutritionLog, Product, ProductConsumption, ProgressPhoto, ShoppingItem, TaskCompletion, Workout } from "@/types/apex";
 
 class ApexDatabase extends Dexie {
   completions!: Table<TaskCompletion, number>;
@@ -10,6 +10,9 @@ class ApexDatabase extends Dexie {
   alerts!: Table<ApexAlert, number>;
   nutritionLogs!: Table<NutritionLog, number>;
   workouts!: Table<Workout, number>;
+  bodyMeasurements!: Table<BodyMeasurement, number>;
+  shoppingItems!: Table<ShoppingItem, number>;
+  chatMessages!: Table<ChatMessage, number>;
   photos!: Table<ProgressPhoto, number>;
   settings!: Table<AppSettings, string>;
 
@@ -28,6 +31,19 @@ class ApexDatabase extends Dexie {
       alerts: "++id, status, severity, source, productId, dueDateKey, createdAt",
       nutritionLogs: "++id, &dateKey, createdAt",
       workouts: "++id, dateKey, focus, createdAt",
+      photos: "++id, zone, createdAt",
+      settings: "id"
+    });
+    this.version(3).stores({
+      completions: "++id, [dateKey+taskId], dateKey, taskId",
+      products: "++id, category, group, name, brand, purchaseDate",
+      productConsumptions: "++id, productId, dateKey, createdAt",
+      alerts: "++id, status, severity, source, productId, dueDateKey, createdAt",
+      nutritionLogs: "++id, &dateKey, createdAt",
+      workouts: "++id, dateKey, focus, createdAt",
+      bodyMeasurements: "++id, dateKey, createdAt",
+      shoppingItems: "++id, status, category, source, productId, createdAt",
+      chatMessages: "++id, role, createdAt",
       photos: "++id, zone, createdAt",
       settings: "id"
     });
