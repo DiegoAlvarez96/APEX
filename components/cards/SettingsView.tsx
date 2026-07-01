@@ -87,6 +87,38 @@ export function SettingsView({
           <Download size={18} /> Exportar datos
         </button>
       </Card>
+
+      <Card>
+        <SectionTitle title="IA y objetivos" eyebrow="Preparado para OpenAI" />
+        <div className="space-y-3">
+          <label className="block rounded-2xl bg-white/[0.06] p-4 light:bg-black/[0.04]">
+            <span className="text-xs text-white/45 light:text-black/45">OpenAI API key</span>
+            <input
+              className="mt-1 w-full bg-transparent text-sm outline-none"
+              type="password"
+              value={settings.openAiApiKey ?? ""}
+              onChange={(event) => onUpdateSettings({ openAiApiKey: event.target.value || undefined })}
+              placeholder="sk-..."
+            />
+          </label>
+          <label className="block rounded-2xl bg-white/[0.06] p-4 light:bg-black/[0.04]">
+            <span className="text-xs text-white/45 light:text-black/45">Objetivo nutricion</span>
+            <textarea
+              className="mt-1 min-h-20 w-full bg-transparent text-sm outline-none"
+              value={settings.nutritionGoal ?? ""}
+              onChange={(event) => onUpdateSettings({ nutritionGoal: event.target.value })}
+            />
+          </label>
+          <label className="block rounded-2xl bg-white/[0.06] p-4 light:bg-black/[0.04]">
+            <span className="text-xs text-white/45 light:text-black/45">Objetivo entrenamiento</span>
+            <textarea
+              className="mt-1 min-h-20 w-full bg-transparent text-sm outline-none"
+              value={settings.trainingGoal ?? ""}
+              onChange={(event) => onUpdateSettings({ trainingGoal: event.target.value })}
+            />
+          </label>
+        </div>
+      </Card>
     </div>
   );
 }

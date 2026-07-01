@@ -3,31 +3,60 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import { Dashboard } from "@/components/cards/Dashboard";
+import { AlertsView } from "@/components/cards/AlertsView";
 import { CalendarView } from "@/components/cards/CalendarView";
 import { CareView } from "@/components/cards/CareView";
-import { ProductsView } from "@/components/cards/ProductsView";
+import { InsightsView } from "@/components/cards/InsightsView";
+import { NutritionView } from "@/components/cards/NutritionView";
+import { ProductsSmartView } from "@/components/cards/ProductsSmartView";
 import { SettingsView } from "@/components/cards/SettingsView";
 import { StatsView } from "@/components/cards/StatsView";
+import { TimelineView } from "@/components/cards/TimelineView";
+import { TrainingView } from "@/components/cards/TrainingView";
 import { BottomNav, type ViewKey } from "@/components/layout/BottomNav";
 import { useApexStore } from "@/hooks/useApexStore";
+import { buildTimeline } from "@/lib/timeline";
 
 export default function Home() {
   const [view, setView] = useState<ViewKey>("dashboard");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [calendarMode, setCalendarMode] = useState<"week" | "month">("week");
   const store = useApexStore(selectedDate);
+  const timeline = buildTimeline({
+    completions: store.allCompletions,
+    consumptions: store.productConsumptions,
+    nutritionLogs: store.nutritionLogs,
+    workouts: store.workouts,
+    alerts: store.alerts,
+    stock: store.stockSummaries
+  });
+  const habitsCompleted = store.completions.filter((item) => item.done).length;
 
   const screen = {
-    dashboard: <Dashboard selectedDate={selectedDate} isDone={store.isDone} onToggle={(id) => void store.toggleTask(id)} />,
-    calendar: <CalendarView selectedDate={selectedDate} onSelectDate={setSelectedDate} mode={calendarMode} onModeChange={setCalendarMode} />,
-    care: <CareView photos={store.photos} onAddPhoto={(photo) => void store.addPhoto(photo)} />,
-    products: (
-      <ProductsView
-        products={store.products}
-        onAddProduct={(product) => void store.addProduct(product)}
-        onUpdateQuantity={(id, quantity) => void store.updateProductQuantity(id, quantity)}
+    dashboard: (
+      <Dashboard
+        selectedDate={selectedDate}
+        isDone={store.isDone}
+        onToggle={(id) => void store.toggleTask(id)}
+        nutrition={store.selectedNutrition}
+        workouts={store.selectedWorkouts}
+        stockSummaries={store.stockSummaries}
       />
     ),
+    calendar: <CalendarView selectedDate={selectedDate} onSelectDate={setSelectedDate} mode={calendarMode} onModeChange={setCalendarMode} />,
+    nutrition: <NutritionView nutrition={store.selectedNutrition} onSave={(values) => void store.upsertNutritionLog(values)} />,
+    training: <TrainingView workouts={store.workouts} onAddWorkout={(workout) => void store.addWorkout(workout)} />,
+    care: <CareView photos={store.photos} onAddPhoto={(photo) => void store.addPhoto(photo)} />,
+    products: (
+      <ProductsSmartView
+        summaries={store.stockSummaries}
+        onAddProduct={(product) => void store.addProduct(product)}
+        onAddConsumption={(id, amount, note) => void store.addProductConsumption(id, amount, note)}
+      />
+    ),
+    alerts: <AlertsView alerts={store.alerts} onSyncStockAlerts={() => void store.syncStockAlerts()} onUpdateStatus={(id, status) => void store.updateAlertStatus(id, status)} />,
+    timeline: <TimelineView events={timeline} />,
+    ai: <InsightsView settings={store.settings} nutrition={store.selectedNutrition} stock={store.stockSummaries} workouts={store.workouts} habitsCompleted={habitsCompleted} />,
     stats: <StatsView completions={store.allCompletions} />,
     settings: <SettingsView settings={store.settings} onUpdateSettings={(settings) => void store.updateSettings(settings)} onExport={store.exportData} />
   }[view];

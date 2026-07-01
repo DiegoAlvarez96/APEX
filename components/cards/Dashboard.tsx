@@ -1,28 +1,36 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CalendarCheck, Droplets, RollerCoaster } from "lucide-react";
+import { Activity, CalendarCheck, Droplets, Flame, GlassWater, RollerCoaster, Scale, Utensils } from "lucide-react";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { ProgressRing } from "@/components/cards/ProgressRing";
 import { TaskList } from "@/components/cards/TaskList";
 import { prettyDate, slotForHour, slotLabel } from "@/lib/date";
 import { getRoutineForDate } from "@/lib/routines";
+import type { NutritionLog, ProductStockSummary, Workout } from "@/types/apex";
 
 export function Dashboard({
   selectedDate,
   isDone,
-  onToggle
+  onToggle,
+  nutrition,
+  workouts,
+  stockSummaries
 }: {
   selectedDate: Date;
   isDone: (taskId: string) => boolean;
   onToggle: (taskId: string) => void;
+  nutrition?: NutritionLog;
+  workouts: Workout[];
+  stockSummaries: ProductStockSummary[];
 }) {
   const routine = getRoutineForDate(selectedDate);
   const currentSlot = slotForHour(new Date());
   const doneCount = routine.tasks.filter((task) => isDone(task.id)).length;
   const progress = routine.tasks.length ? (doneCount / routine.tasks.length) * 100 : 0;
   const oral = routine.tasks.find((task) => task.label.toLowerCase().includes("oral"));
-  const dermaroller = routine.weekday === 4 ? "Hoy" : "Jueves";
+  const criticalStock = stockSummaries.filter((summary) => summary.status !== "ok").length;
+  const supplementsLeft = stockSummaries.filter((summary) => /prote|creatina|omega|minoxidil|suplement/i.test(`${summary.product.name} ${summary.product.category}`)).length;
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
@@ -43,16 +51,16 @@ export function Dashboard({
       </Card>
 
       <div className="grid grid-cols-2 gap-3">
-        <Card className="p-4">
-          <Droplets className="mb-3 text-aqua" size={22} />
-          <p className="text-xs text-white/45 light:text-black/45">Minoxidil oral</p>
-          <p className="mt-1 text-lg font-semibold">{oral && isDone(oral.id) ? "Completo" : "Pendiente"}</p>
-        </Card>
-        <Card className="p-4">
-          <RollerCoaster className="mb-3 text-coral" size={22} />
-          <p className="text-xs text-white/45 light:text-black/45">Dermaroller</p>
-          <p className="mt-1 text-lg font-semibold">{dermaroller}</p>
-        </Card>
+        <Metric icon={Scale} label="Peso actual" value={nutrition?.weightKg ? `${nutrition.weightKg} kg` : "-"} />
+        <Metric icon={Flame} label="Calorias" value={nutrition ? `${Math.round(nutrition.calories)}` : "-"} />
+        <Metric icon={Utensils} label="Proteinas" value={nutrition ? `${Math.round(nutrition.protein)} g` : "-"} />
+        <Metric icon={Activity} label="Carbohidratos" value={nutrition ? `${Math.round(nutrition.carbs)} g` : "-"} />
+        <Metric icon={Droplets} label="Grasas" value={nutrition ? `${Math.round(nutrition.fat)} g` : "-"} />
+        <Metric icon={GlassWater} label="Agua" value={nutrition ? `${(nutrition.waterMl / 1000).toFixed(1)} L` : "-"} />
+        <Metric icon={RollerCoaster} label="Entreno realizado" value={workouts.length ? "Si" : "No"} />
+        <Metric icon={CalendarCheck} label="Stock critico" value={`${criticalStock}`} />
+        <Metric icon={Droplets} label="Minoxidil oral" value={oral && isDone(oral.id) ? "Completo" : "Pendiente"} />
+        <Metric icon={RollerCoaster} label="Suplementos" value={`${supplementsLeft}`} />
       </div>
 
       {(["morning", "afternoon", "night"] as const).map((slot) => (
@@ -67,5 +75,15 @@ export function Dashboard({
         Recordatorios activos: 08:00 rutina manana, 21:00 rutina noche y dermaroller los jueves.
       </Card>
     </motion.div>
+  );
+}
+
+function Metric({ icon: Icon, label, value }: { icon: typeof Scale; label: string; value: string }) {
+  return (
+    <Card className="p-4">
+      <Icon className="mb-3 text-limeglass" size={21} />
+      <p className="text-xs text-white/45 light:text-black/45">{label}</p>
+      <p className="mt-1 truncate text-lg font-semibold">{value}</p>
+    </Card>
   );
 }
