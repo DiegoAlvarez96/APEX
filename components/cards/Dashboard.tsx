@@ -53,6 +53,18 @@ export function Dashboard({
         <ProgressRing value={progress} label="Progreso" />
       </Card>
 
+      {(["morning", "afternoon", "night"] as const).map((slot) => (
+        <Card key={slot}>
+          <SectionTitle eyebrow={slot === currentSlot ? "Ahora" : undefined} title={slotLabel(slot)} />
+          <TaskList tasks={routine.tasks.filter((task) => task.slot === slot)} isDone={isDone} onToggle={onToggle} />
+        </Card>
+      ))}
+
+      <Card className="flex items-center gap-3 p-4 text-sm text-white/60 light:text-black/60">
+        <CalendarCheck className="shrink-0 text-limeglass" size={21} />
+        Recordatorios activos: 08:00 rutina manana, 21:00 rutina noche y dermaroller los jueves.
+      </Card>
+
       <div className="grid grid-cols-2 gap-3">
         <Metric icon={Scale} label="Peso actual" value={nutrition?.weightKg ? `${nutrition.weightKg} kg` : "-"} />
         <Metric icon={Flame} label="Calorias" value={nutrition ? `${Math.round(nutrition.calories)}` : "-"} />
@@ -66,18 +78,6 @@ export function Dashboard({
         <Metric icon={RollerCoaster} label="Suplementos" value={`${supplementsLeft}`} />
         <Metric icon={CalendarCheck} label="Sueno" value={sleep ? formatSleepDuration(sleep.durationMinutes) : "-"} />
       </div>
-
-      {(["morning", "afternoon", "night"] as const).map((slot) => (
-        <Card key={slot}>
-          <SectionTitle eyebrow={slot === currentSlot ? "Ahora" : undefined} title={slotLabel(slot)} />
-          <TaskList tasks={routine.tasks.filter((task) => task.slot === slot)} isDone={isDone} onToggle={onToggle} />
-        </Card>
-      ))}
-
-      <Card className="flex items-center gap-3 p-4 text-sm text-white/60 light:text-black/60">
-        <CalendarCheck className="shrink-0 text-limeglass" size={21} />
-        Recordatorios activos: 08:00 rutina manana, 21:00 rutina noche y dermaroller los jueves.
-      </Card>
     </motion.div>
   );
 }

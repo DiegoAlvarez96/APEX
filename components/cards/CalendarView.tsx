@@ -118,11 +118,6 @@ export function CalendarView({
         <AgendaBlock title="Notas" items={detail.notes} />
       </Card>
 
-      <Card>
-        <SectionTitle title="Skin care" eyebrow={selectedDateLabel} />
-        <TaskList tasks={skincareTasks} isDone={isDone} onToggle={onToggle} />
-      </Card>
-
       <NutritionAgendaCard nutrition={nutrition} selectedDateLabel={selectedDateLabel} />
 
       <TrainingAgendaCard workouts={workoutsForDay} selectedDateLabel={selectedDateLabel} />
