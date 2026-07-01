@@ -1,7 +1,7 @@
 "use client";
 
 import Dexie, { type Table } from "dexie";
-import type { ApexAlert, AppSettings, BodyMeasurement, ChatMessage, NutritionLog, Product, ProductConsumption, ProgressPhoto, ShoppingItem, TaskCompletion, Workout } from "@/types/apex";
+import type { AgendaNote, ApexAlert, AppSettings, BodyMeasurement, ChatMessage, FoodCacheItem, NutritionLog, Product, ProductConsumption, ProgressPhoto, ShoppingItem, SleepLog, TaskCompletion, Workout } from "@/types/apex";
 
 class ApexDatabase extends Dexie {
   completions!: Table<TaskCompletion, number>;
@@ -9,10 +9,13 @@ class ApexDatabase extends Dexie {
   productConsumptions!: Table<ProductConsumption, number>;
   alerts!: Table<ApexAlert, number>;
   nutritionLogs!: Table<NutritionLog, number>;
+  foodCache!: Table<FoodCacheItem, number>;
   workouts!: Table<Workout, number>;
   bodyMeasurements!: Table<BodyMeasurement, number>;
   shoppingItems!: Table<ShoppingItem, number>;
   chatMessages!: Table<ChatMessage, number>;
+  agendaNotes!: Table<AgendaNote, number>;
+  sleepLogs!: Table<SleepLog, number>;
   photos!: Table<ProgressPhoto, number>;
   settings!: Table<AppSettings, string>;
 
@@ -44,6 +47,22 @@ class ApexDatabase extends Dexie {
       bodyMeasurements: "++id, dateKey, createdAt",
       shoppingItems: "++id, status, category, source, productId, createdAt",
       chatMessages: "++id, role, createdAt",
+      photos: "++id, zone, createdAt",
+      settings: "id"
+    });
+    this.version(4).stores({
+      completions: "++id, [dateKey+taskId], dateKey, taskId",
+      products: "++id, category, group, name, brand, purchaseDate",
+      productConsumptions: "++id, productId, dateKey, createdAt",
+      alerts: "++id, status, severity, source, productId, dueDateKey, createdAt",
+      nutritionLogs: "++id, &dateKey, createdAt",
+      foodCache: "++id, &key, createdAt",
+      workouts: "++id, dateKey, focus, createdAt",
+      bodyMeasurements: "++id, dateKey, createdAt",
+      shoppingItems: "++id, status, category, source, productId, createdAt",
+      chatMessages: "++id, role, createdAt",
+      agendaNotes: "++id, &dateKey, updatedAt",
+      sleepLogs: "++id, &dateKey, createdAt",
       photos: "++id, zone, createdAt",
       settings: "id"
     });

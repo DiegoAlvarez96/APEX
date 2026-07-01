@@ -49,6 +49,10 @@ export function slotForHour(date = new Date()): RoutineSlot {
   return "night";
 }
 
+export function hourInAppTimeZone(date = new Date()) {
+  return zonedParts(date).hour;
+}
+
 export function slotLabel(slot: RoutineSlot) {
   return {
     morning: "Mañana",

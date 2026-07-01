@@ -2,13 +2,13 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Camera, PackagePlus, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { dateKey, formatDateKey } from "@/lib/date";
-import { productSuggestions } from "@/lib/shopping";
-import { formatAmount, productDisplayName, stockColor } from "@/lib/stock";
+import { productSuggestions, productTemplates, type ProductTemplate } from "@/lib/shopping";
+import { formatAmount, productDisplayName, productInitialStock, stockColor } from "@/lib/stock";
 import type { Product, ProductGroup, ProductStockSummary } from "@/types/apex";
 
 const productSchema = z.object({
@@ -21,7 +21,9 @@ const productSchema = z.object({
   unit: z.string().min(1),
   purchaseDate: z.string().min(1),
   cost: z.coerce.number().min(0),
-  lowAt: z.coerce.number().min(0)
+  lowAt: z.coerce.number().min(0),
+  recommendedConsumption: z.coerce.number().min(0).optional(),
+  dailyConsumptionEstimate: z.coerce.number().min(0).optional()
 });
 
 type ProductForm = z.infer<typeof productSchema>;
@@ -37,7 +39,7 @@ export function ProductsSmartView({
 }) {
   const [image, setImage] = useState<string>();
   const [group, setGroup] = useState<ProductGroup>("nutrition");
-  const { register, handleSubmit, reset } = useForm<ProductForm>({
+  const { register, handleSubmit, reset, setValue } = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
     defaultValues: { unit: "g", purchaseDate: dateKey(), lowAt: 20, cost: 0, initialStock: 100, size: 100 }
   });
@@ -51,10 +53,31 @@ export function ProductsSmartView({
   async function handleImage(file: File | null) {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") setImage(reader.result);
+    reader.onload = async () => {
+      if (typeof reader.result !== "string") return;
+      setImage(reader.result);
+      const response = await fetch("/api/ai/vision/product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: reader.result })
+      });
+      if (response.ok) applyTemplate(await response.json() as ProductTemplate & { image?: string });
     };
     reader.readAsDataURL(file);
+  }
+
+  function applyTemplate(template: ProductTemplate) {
+    setGroup(template.group);
+    setValue("commercialName", template.commercialName);
+    setValue("name", template.name);
+    setValue("brand", template.brand);
+    setValue("category", template.category);
+    setValue("size", template.size);
+    setValue("initialStock", template.initialStock);
+    setValue("unit", template.unit);
+    setValue("recommendedConsumption", template.recommendedConsumption);
+    setValue("dailyConsumptionEstimate", template.dailyConsumptionEstimate);
+    if (template.image) setImage(template.image);
   }
 
   return (
@@ -81,9 +104,10 @@ export function ProductsSmartView({
             <option value="supplement">Suplementos</option>
             <option value="other">Otros</option>
           </select>
+          <p className="text-xs leading-5 text-white/45 light:text-black/45">{categoryHelp[group]}</p>
           <div className="no-scrollbar flex gap-2 overflow-x-auto">
             {productSuggestions[group].map((suggestion) => (
-              <button key={suggestion} className="shrink-0 rounded-full bg-white/[0.08] px-3 py-2 text-xs light:bg-black/[0.05]" type="button">
+              <button key={suggestion} onClick={() => applyTemplate(productTemplates[suggestion])} className="shrink-0 rounded-full bg-white/[0.08] px-3 py-2 text-xs light:bg-black/[0.05]" type="button">
                 {suggestion}
               </button>
             ))}
@@ -97,6 +121,8 @@ export function ProductsSmartView({
             <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" type="number" placeholder="Tamano" {...register("size")} />
             <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" type="date" {...register("purchaseDate")} />
             <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" type="number" placeholder="Costo" {...register("cost")} />
+            <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" type="number" placeholder="Consumo recomendado" {...register("recommendedConsumption")} />
+            <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" type="number" placeholder="Consumo diario estimado" {...register("dailyConsumptionEstimate")} />
           </div>
           <button className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" type="submit">
             <PackagePlus size={18} /> Guardar producto
@@ -112,6 +138,13 @@ export function ProductsSmartView({
     </div>
   );
 }
+
+const categoryHelp: Record<ProductGroup, string> = {
+  nutrition: "Alimentacion: productos que afectan comidas, macros y energia diaria.",
+  supplement: "Suplementos: creatina, omega, vitaminas y apoyo nutricional.",
+  personalCare: "Cuidado personal: skincare, cabello, barba, higiene, minoxidil y productos de rutina.",
+  other: "Otros: productos generales que queres controlar sin categoria especifica."
+};
 
 function ProductStockCard({ summary, onAddConsumption }: { summary: ProductStockSummary; onAddConsumption: (productId: number, amount: number) => void }) {
   const [amount, setAmount] = useState("");
@@ -129,12 +162,12 @@ function ProductStockCard({ summary, onAddConsumption }: { summary: ProductStock
   return (
     <Card className="overflow-hidden p-0">
       <div className="flex gap-4 p-4">
-        <ProductImage image={product.image} name={name} />
+        <ProductImage image={product.image ?? automaticProductImage(product)} name={name} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate text-lg font-semibold">{name}</p>
-              <p className="text-sm text-white/45 light:text-black/45">{product.brand || "Sin marca"} · {product.category}</p>
+              <p className="text-sm text-white/45 light:text-black/45">{product.brand || "Sin marca"} - {product.category}</p>
             </div>
             <BrandMark brand={product.brand} logo={product.brandLogo} />
           </div>
@@ -150,6 +183,7 @@ function ProductStockCard({ summary, onAddConsumption }: { summary: ProductStock
       </div>
       <div className="grid grid-cols-2 gap-2 border-t border-white/10 p-4 text-sm light:border-black/10">
         <Stat label="Stock actual" value={`${formatAmount(summary.currentStock)} ${product.unit}`} />
+        <Stat label="Tamano" value={`${formatAmount(product.size ?? productInitialStock(product))} ${product.unit}`} />
         <Stat label="Compra aprox." value={summary.estimatedRestockDate ? formatDateKey(summary.estimatedRestockDate) : "-"} />
         <Stat label="Semanal" value={`${formatAmount(summary.weeklyConsumption)} ${product.unit}`} />
         <Stat label="Mensual" value={`${formatAmount(summary.monthlyConsumption)} ${product.unit}`} />
@@ -171,16 +205,28 @@ function ProductStockCard({ summary, onAddConsumption }: { summary: ProductStock
 }
 
 function ProductImage({ image, name }: { image?: string; name: string }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [image]);
+  const showImage = image && !failed;
   return (
     <div className="grid size-24 shrink-0 place-items-center overflow-hidden rounded-[26px] bg-white/[0.08] light:bg-black/[0.04]">
-      {image ? (
+      {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={image} alt={name} className="size-full object-cover" />
+        <img src={image} alt={name} className="size-full object-cover" onError={() => setFailed(true)} />
       ) : (
         <span className="text-3xl font-semibold text-white/35 light:text-black/35">{name.slice(0, 1).toUpperCase()}</span>
       )}
     </div>
   );
+}
+
+function automaticProductImage(product: Product) {
+  const value = `${product.name} ${product.commercialName ?? ""} ${product.category} ${product.group ?? ""}`.toLowerCase();
+  if (/prote|whey|creatina|omega|vitamina|magnesio|suplement/.test(value)) return "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?auto=format&fit=crop&w=240&q=70";
+  if (/protector|retinol|limpiador|skincare|crema/.test(value)) return "https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=240&q=70";
+  if (/shampoo|higiene|cabello/.test(value)) return "https://images.unsplash.com/photo-1631729371254-42c2892f0e6e?auto=format&fit=crop&w=240&q=70";
+  if (/avena|arroz|yogur|atun|alimento|nutri|comida/.test(value)) return "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=240&q=70";
+  return undefined;
 }
 
 function BrandMark({ brand, logo }: { brand?: string; logo?: string }) {

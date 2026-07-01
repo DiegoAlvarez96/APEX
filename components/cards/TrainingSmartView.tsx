@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Dumbbell, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, Copy, Dumbbell, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import type { Workout, WorkoutExercise } from "@/types/apex";
@@ -23,7 +23,8 @@ export function TrainingSmartView({
   const [focus, setFocus] = useState("Fuerza");
   const [intensity, setIntensity] = useState<Workout["intensity"]>(4);
   const [notes, setNotes] = useState("");
-  const [rawExercises, setRawExercises] = useState("Dominadas 4x10x0\nRemo 4x12x40\nPullover 3x15x20\nPeso muerto 4x8x80");
+  const [rawExercises, setRawExercises] = useState("Dominadas 4x10x0 rir2 rest90\nRemo con barra 4x12x40 rir2 rest90\nJalon al pecho 4x10x45 rir2 rest75\nPullover 3x15x20 rir1 rest60\nPeso muerto 4x8x80 rir2 rest120");
+  const preview = parseExercises(rawExercises);
 
   function load(workout: Workout) {
     setEditing(workout);
@@ -31,7 +32,7 @@ export function TrainingSmartView({
     setFocus(workout.focus);
     setIntensity(workout.intensity);
     setNotes(workout.notes ?? "");
-    setRawExercises(workout.exercises.map((exercise) => `${exercise.name} ${exercise.sets.length}x${exercise.sets[0]?.reps ?? 10}x${exercise.sets[0]?.weight ?? 0}`).join("\n"));
+    setRawExercises(workout.exercises.map((exercise) => `${exercise.name} ${exercise.sets.length}x${exercise.sets[0]?.reps ?? 10}x${exercise.sets[0]?.weight ?? 0} rir${exercise.sets[0]?.rir ?? 2} rest${exercise.sets[0]?.restSeconds ?? 90}`).join("\n"));
   }
 
   function submit() {
@@ -45,9 +46,9 @@ export function TrainingSmartView({
 
   return (
     <div className="space-y-5">
-      <header className="px-1 pt-2"><p className="text-sm text-white/45 light:text-black/45">Series, pesos y progreso</p><h1 className="text-3xl font-semibold">Entrenamiento</h1></header>
+      <header className="px-1 pt-2"><p className="text-sm text-white/45 light:text-black/45">Diario de gimnasio</p><h1 className="text-3xl font-semibold">Entrenamiento</h1></header>
       <Card>
-        <SectionTitle title={editing ? "Editar sesion" : "Registrar sesion"} eyebrow="Historial completo" />
+        <SectionTitle title={editing ? "Editar sesion" : "Registrar sesion"} eyebrow="Peso, reps, RIR y descanso" />
         <div className="grid gap-3">
           <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={title} onChange={(event) => setTitle(event.target.value)} />
           <div className="grid grid-cols-2 gap-3">
@@ -56,17 +57,39 @@ export function TrainingSmartView({
               {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>Intensidad {value}</option>)}
             </select>
           </div>
-          <textarea className="min-h-32 rounded-3xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={rawExercises} onChange={(event) => setRawExercises(event.target.value)} />
+          <textarea className="min-h-36 rounded-3xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={rawExercises} onChange={(event) => setRawExercises(event.target.value)} />
+          <p className="text-xs leading-5 text-white/45 light:text-black/45">Formato: ejercicio series x reps x peso, RIR opcional y descanso. Ejemplo: Remo 4x12x40 rir2 rest90.</p>
           <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" placeholder="Observaciones" value={notes} onChange={(event) => setNotes(event.target.value)} />
           <button className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" onClick={submit} type="button"><Plus size={18} /> {editing ? "Guardar cambios" : "Guardar entrenamiento"}</button>
+        </div>
+      </Card>
+      <Card>
+        <SectionTitle title="Rutina diaria" eyebrow="Checklist" />
+        <div className="space-y-2">
+          {preview.map((exercise) => (
+            <div key={exercise.id} className="flex items-center justify-between rounded-2xl bg-white/[0.06] p-3 text-sm light:bg-black/[0.04]">
+              <span>{exercise.name} - {exercise.sets.length}x{exercise.sets[0]?.reps} - {exercise.sets[0]?.weight ?? 0} kg</span>
+              <Check className="text-white/35 light:text-black/35" size={17} />
+            </div>
+          ))}
         </div>
       </Card>
       <div className="space-y-3">
         {workouts.map((workout) => (
           <Card key={workout.id} className="p-4">
-            <div className="flex items-start gap-3"><div className="grid size-11 place-items-center rounded-2xl bg-white/[0.08] light:bg-black/[0.05]"><Dumbbell className="text-limeglass" size={20} /></div>
-              <div className="min-w-0 flex-1"><p className="font-semibold">{workout.title}</p><p className="text-sm text-white/45 light:text-black/45">{workout.focus} · intensidad {workout.intensity} · {workout.exercises.length} ejercicios</p>
-                <div className="mt-3 space-y-1 text-sm text-white/65 light:text-black/65">{workout.exercises.map((exercise) => <p key={exercise.id}>{exercise.name} · {exercise.sets.length} series · {exercise.sets[0]?.reps ?? 0} reps · {exercise.sets[0]?.weight ?? 0} kg</p>)}</div>
+            <div className="flex items-start gap-3">
+              <div className="grid size-11 place-items-center rounded-2xl bg-white/[0.08] light:bg-black/[0.05]"><Dumbbell className="text-limeglass" size={20} /></div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">{workout.title}</p>
+                <p className="text-sm text-white/45 light:text-black/45">{workout.focus} - intensidad {workout.intensity} - {workout.exercises.length} ejercicios</p>
+                <div className="mt-3 space-y-2 text-sm text-white/65 light:text-black/65">
+                  {workout.exercises.map((exercise, index) => (
+                    <button key={exercise.id} className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left ${exercise.completed ? "bg-limeglass text-black" : "bg-white/[0.05] light:bg-black/[0.04]"}`} onClick={() => workout.id && onUpdateWorkout(workout.id, { exercises: workout.exercises.map((item, itemIndex) => itemIndex === index ? { ...item, completed: !item.completed, sets: item.sets.map((set) => ({ ...set, completed: !item.completed })) } : item) })} type="button">
+                      <span>{exercise.name} - {exercise.sets.length} series - {exercise.sets[0]?.reps ?? 0} reps - {exercise.sets[0]?.weight ?? 0} kg - RIR {exercise.sets[0]?.rir ?? "-"} - {exercise.sets[0]?.restSeconds ?? 0}s</span>
+                      <Check size={16} />
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2">
@@ -87,11 +110,13 @@ function Action({ icon: Icon, label, onClick }: { icon: typeof Pencil; label: st
 
 function parseExercises(value: string): WorkoutExercise[] {
   return value.split("\n").map((line) => line.trim()).filter(Boolean).map((line, index) => {
-    const match = line.match(/^(.*?)(\d+)x(\d+)(?:x(\d+(?:\.\d+)?))?$/i);
+    const match = line.match(/^(.*?)(\d+)x(\d+)(?:x(\d+(?:\.\d+)?))?(?:\s+rir(\d+))?(?:\s+rest(\d+))?$/i);
     const name = match?.[1].trim() || line;
     const sets = Number(match?.[2] ?? 1);
     const reps = Number(match?.[3] ?? 10);
     const weight = Number(match?.[4] ?? 0);
-    return { id: `${Date.now()}-${index}`, name, sets: Array.from({ length: sets }, () => ({ reps, weight })) };
+    const rir = match?.[5] ? Number(match[5]) : undefined;
+    const restSeconds = match?.[6] ? Number(match[6]) : undefined;
+    return { id: `${Date.now()}-${index}`, name, completed: false, sets: Array.from({ length: sets }, () => ({ reps, weight, rir, restSeconds, completed: false })) };
   });
 }

@@ -5,24 +5,28 @@ import { useState } from "react";
 import { Dashboard } from "@/components/cards/Dashboard";
 import { AlertsView } from "@/components/cards/AlertsView";
 import { CalendarView } from "@/components/cards/CalendarView";
-import { CareView } from "@/components/cards/CareView";
 import { ChatAiView } from "@/components/cards/ChatAiView";
 import { HealthAestheticView } from "@/components/cards/HealthAestheticView";
+import { HomeView } from "@/components/cards/HomeView";
 import { InsightsView } from "@/components/cards/InsightsView";
 import { NutritionSmartView } from "@/components/cards/NutritionSmartView";
 import { PhysicalView } from "@/components/cards/PhysicalView";
 import { ProductsSmartView } from "@/components/cards/ProductsSmartView";
 import { SettingsView } from "@/components/cards/SettingsView";
 import { ShoppingView } from "@/components/cards/ShoppingView";
+import { SleepView } from "@/components/cards/SleepView";
 import { StatsView } from "@/components/cards/StatsView";
 import { TimelineView } from "@/components/cards/TimelineView";
 import { TrainingSmartView } from "@/components/cards/TrainingSmartView";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { BottomNav, type ViewKey } from "@/components/layout/BottomNav";
 import { useApexStore } from "@/hooks/useApexStore";
+import { dateKey, hourInAppTimeZone } from "@/lib/date";
 import { buildTimeline } from "@/lib/timeline";
+import { useEffect } from "react";
 
 export default function Home() {
-  const [view, setView] = useState<ViewKey>("dashboard");
+  const [view, setView] = useState<ViewKey>(() => initialViewForNow());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [calendarMode, setCalendarMode] = useState<"week" | "month">("week");
   const store = useApexStore(selectedDate);
@@ -32,11 +36,17 @@ export default function Home() {
     nutritionLogs: store.nutritionLogs,
     workouts: store.workouts,
     alerts: store.alerts,
-    stock: store.stockSummaries
+    stock: store.stockSummaries,
+    sleepLogs: store.sleepLogs
   });
   const habitsCompleted = store.completions.filter((item) => item.done).length;
 
+  useEffect(() => {
+    if (store.ready && view === "sleep" && store.selectedSleep) setView("home");
+  }, [store.ready, store.selectedSleep, view]);
+
   const screen = {
+    home: <HomeView onNavigate={setView} />,
     dashboard: (
       <Dashboard
         selectedDate={selectedDate}
@@ -45,14 +55,14 @@ export default function Home() {
         nutrition={store.selectedNutrition}
         workouts={store.selectedWorkouts}
         stockSummaries={store.stockSummaries}
+        sleep={store.selectedSleep}
       />
     ),
-    calendar: <CalendarView selectedDate={selectedDate} onSelectDate={setSelectedDate} mode={calendarMode} onModeChange={setCalendarMode} workouts={store.workouts} stockSummaries={store.stockSummaries} />,
-    nutrition: <NutritionSmartView nutrition={store.selectedNutrition} onSave={(values) => void store.upsertNutritionLog(values)} onDelete={(id) => void store.deleteNutritionLog(id)} onDuplicate={(log) => void store.duplicateNutritionLog(log)} />,
+    calendar: <CalendarView selectedDate={selectedDate} onSelectDate={setSelectedDate} mode={calendarMode} onModeChange={setCalendarMode} workouts={store.workouts} stockSummaries={store.stockSummaries} note={store.selectedAgendaNote?.note} onSaveNote={(note) => void store.saveAgendaNote(note)} isDone={store.isDone} onToggle={(id) => void store.toggleTask(id)} />,
+    nutrition: <NutritionSmartView nutrition={store.selectedNutrition} selectedDateKey={dateKey(selectedDate)} onSave={(values) => void store.upsertNutritionLog(values)} onDelete={(id) => void store.deleteNutritionLog(id)} onEstimateFood={store.estimateFood} />,
     training: <TrainingSmartView workouts={store.workouts} onAddWorkout={(workout) => void store.addWorkout(workout)} onUpdateWorkout={(id, workout) => void store.updateWorkout(id, workout)} onDeleteWorkout={(id) => void store.deleteWorkout(id)} onDuplicateWorkout={(workout) => void store.duplicateWorkout(workout)} />,
     physical: <PhysicalView latest={store.latestBody} measurements={store.bodyMeasurements} onSave={(value) => void store.addBodyMeasurement(value)} />,
     health: <HealthAestheticView />,
-    care: <CareView photos={store.photos} onAddPhoto={(photo) => void store.addPhoto(photo)} />,
     products: (
       <ProductsSmartView
         summaries={store.stockSummaries}
@@ -63,14 +73,16 @@ export default function Home() {
     shopping: <ShoppingView items={store.shoppingItems} onSync={() => void store.syncShoppingList()} onUpdate={(id, status) => void store.updateShoppingStatus(id, status)} />,
     alerts: <AlertsView alerts={store.alerts} onSyncStockAlerts={() => void store.syncStockAlerts()} onUpdateStatus={(id, status) => void store.updateAlertStatus(id, status)} />,
     timeline: <TimelineView events={timeline} />,
-    ai: <InsightsView settings={store.settings} nutrition={store.selectedNutrition} stock={store.stockSummaries} workouts={store.workouts} habitsCompleted={habitsCompleted} />,
-    chat: <ChatAiView messages={store.chatMessages} onSend={(content) => void store.sendChatMessage(content)} />,
+    ai: <InsightsView settings={store.settings} nutrition={store.selectedNutrition} stock={store.stockSummaries} workouts={store.workouts} sleep={store.selectedSleep} habitsCompleted={habitsCompleted} />,
+    chat: <ChatAiView messages={store.chatMessages} onSend={(content) => void store.sendChatMessage(content)} onNewChat={() => void store.clearChat()} />,
     stats: <StatsView completions={store.allCompletions} />,
-    settings: <SettingsView settings={store.settings} onUpdateSettings={(settings) => void store.updateSettings(settings)} onExport={store.exportData} />
+    settings: <SettingsView settings={store.settings} onUpdateSettings={(settings) => void store.updateSettings(settings)} onExport={store.exportData} />,
+    sleep: <SleepView sleep={store.selectedSleep} onSave={(sleepTime, wakeTime) => void store.saveSleepLog(sleepTime, wakeTime)} />
   }[view];
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-xl px-4 pb-28 pt-[calc(env(safe-area-inset-top)+18px)]">
+      <AppHeader onNavigate={setView} />
       <AnimatePresence mode="wait">
         <motion.div key={view} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
           {store.ready ? screen : <div className="mt-20 text-center text-sm text-white/50">Cargando APEX...</div>}
@@ -79,4 +91,14 @@ export default function Home() {
       <BottomNav active={view} onChange={setView} />
     </main>
   );
+}
+
+function initialViewForNow(): ViewKey {
+  const hour = hourInAppTimeZone(new Date());
+  if (hour >= 2 && hour < 9) return "sleep";
+  if (hour < 10) return "dashboard";
+  if (hour >= 10 && hour < 19) return "nutrition";
+  if (hour >= 19 && hour < 21) return "training";
+  if (hour >= 21 && hour < 23) return "nutrition";
+  return "dashboard";
 }

@@ -9,6 +9,7 @@ build
 
 dev-server.log
 dev-server.err.log
+next-3005.*.log
 *.tsbuildinfo
 public/sw.js
 public/workbox-*.js

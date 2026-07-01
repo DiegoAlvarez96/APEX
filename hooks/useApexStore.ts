@@ -6,7 +6,8 @@ import { dateKey } from "@/lib/date";
 import { buildStockAlerts, summarizeProductStock } from "@/lib/stock";
 import { buildShoppingSuggestions } from "@/lib/shopping";
 import { answerLocalChat } from "@/lib/chat";
-import type { ApexAlert, AppSettings, BodyMeasurement, ChatMessage, NutritionLog, Product, ProductConsumption, ProgressPhoto, ShoppingItem, TaskCompletion, Workout } from "@/types/apex";
+import { calculateSleepDuration } from "@/lib/sleep";
+import type { AgendaNote, ApexAlert, AppSettings, BodyMeasurement, ChatMessage, FoodEntry, NutritionLog, Product, ProductConsumption, ProgressPhoto, ShoppingItem, SleepLog, TaskCompletion, Workout } from "@/types/apex";
 
 export function useApexStore(selectedDate: Date) {
   const selectedDateKey = useMemo(() => dateKey(selectedDate), [selectedDate]);
@@ -20,12 +21,14 @@ export function useApexStore(selectedDate: Date) {
   const [bodyMeasurements, setBodyMeasurements] = useState<BodyMeasurement[]>([]);
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [agendaNotes, setAgendaNotes] = useState<AgendaNote[]>([]);
+  const [sleepLogs, setSleepLogs] = useState<SleepLog[]>([]);
   const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(defaultSettings);
   const [ready, setReady] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [nextCompletions, nextProducts, nextConsumptions, nextAlerts, nextNutritionLogs, nextWorkouts, nextBody, nextShopping, nextChat, nextPhotos, nextSettings] = await Promise.all([
+    const [nextCompletions, nextProducts, nextConsumptions, nextAlerts, nextNutritionLogs, nextWorkouts, nextBody, nextShopping, nextChat, nextAgendaNotes, nextSleepLogs, nextPhotos, nextSettings] = await Promise.all([
       db.completions.where("dateKey").equals(selectedDateKey).toArray(),
       db.products.orderBy("purchaseDate").reverse().toArray(),
       db.productConsumptions.orderBy("createdAt").reverse().toArray(),
@@ -35,6 +38,8 @@ export function useApexStore(selectedDate: Date) {
       db.bodyMeasurements.orderBy("createdAt").reverse().toArray(),
       db.shoppingItems.orderBy("createdAt").reverse().toArray(),
       db.chatMessages.orderBy("createdAt").toArray(),
+      db.agendaNotes.orderBy("updatedAt").reverse().toArray(),
+      db.sleepLogs.orderBy("createdAt").reverse().toArray(),
       db.photos.orderBy("createdAt").reverse().toArray(),
       ensureSettings()
     ]);
@@ -48,6 +53,8 @@ export function useApexStore(selectedDate: Date) {
     setBodyMeasurements(nextBody);
     setShoppingItems(nextShopping);
     setChatMessages(nextChat);
+    setAgendaNotes(nextAgendaNotes);
+    setSleepLogs(nextSleepLogs);
     setPhotos(nextPhotos);
     setSettingsState(nextSettings);
     setReady(true);
@@ -68,6 +75,8 @@ export function useApexStore(selectedDate: Date) {
     [selectedDateKey, workouts]
   );
   const latestBody = useMemo(() => bodyMeasurements[0], [bodyMeasurements]);
+  const selectedAgendaNote = useMemo(() => agendaNotes.find((note) => note.dateKey === selectedDateKey), [agendaNotes, selectedDateKey]);
+  const selectedSleep = useMemo(() => sleepLogs.find((log) => log.dateKey === selectedDateKey), [selectedDateKey, sleepLogs]);
 
   useEffect(() => {
     void refresh();
@@ -220,13 +229,13 @@ export function useApexStore(selectedDate: Date) {
 
   const sendChatMessage = useCallback(async (content: string) => {
     await db.chatMessages.add({ role: "user", content, createdAt: new Date().toISOString() });
-    const context = { nutrition: selectedNutrition, stock: stockSummaries, workouts, body: latestBody };
+    const context = { nutrition: selectedNutrition, stock: stockSummaries, workouts, body: latestBody, sleep: selectedSleep };
     let answer = answerLocalChat(content, context);
     try {
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content, context })
+        body: JSON.stringify({ message: content, context, history: chatMessages.slice(-16) })
       });
       if (response.ok) {
         const data = (await response.json()) as { answer?: string };
@@ -237,7 +246,43 @@ export function useApexStore(selectedDate: Date) {
     }
     await db.chatMessages.add({ role: "assistant", content: answer, createdAt: new Date().toISOString() });
     await refresh();
-  }, [latestBody, refresh, selectedNutrition, stockSummaries, workouts]);
+  }, [chatMessages, latestBody, refresh, selectedNutrition, selectedSleep, stockSummaries, workouts]);
+
+  const clearChat = useCallback(async () => {
+    await db.chatMessages.clear();
+    await refresh();
+  }, [refresh]);
+
+  const saveAgendaNote = useCallback(async (note: string) => {
+    const existing = await db.agendaNotes.where("dateKey").equals(selectedDateKey).first();
+    const payload = { dateKey: selectedDateKey, note, updatedAt: new Date().toISOString() };
+    if (existing?.id) await db.agendaNotes.update(existing.id, payload);
+    else await db.agendaNotes.add(payload);
+    await refresh();
+  }, [refresh, selectedDateKey]);
+
+  const saveSleepLog = useCallback(async (sleepTime: string, wakeTime: string) => {
+    const durationMinutes = calculateSleepDuration(sleepTime, wakeTime);
+    const existing = await db.sleepLogs.where("dateKey").equals(selectedDateKey).first();
+    const payload = { dateKey: selectedDateKey, sleepTime, wakeTime, durationMinutes, updatedAt: new Date().toISOString() };
+    if (existing?.id) await db.sleepLogs.update(existing.id, payload);
+    else await db.sleepLogs.add({ ...payload, createdAt: new Date().toISOString() });
+    await refresh();
+  }, [refresh, selectedDateKey]);
+
+  const estimateFood = useCallback(async (text: string): Promise<FoodEntry> => {
+    const key = text.trim().toLowerCase();
+    const cached = await db.foodCache.where("key").equals(key).first();
+    if (cached) return cached.entry;
+    const response = await fetch("/api/ai/food", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    const entry = (await response.json()) as FoodEntry;
+    await db.foodCache.put({ key, entry, createdAt: new Date().toISOString() });
+    return entry;
+  }, []);
 
   const addPhoto = useCallback(
     async (photo: Omit<ProgressPhoto, "id" | "createdAt">) => {
@@ -268,6 +313,8 @@ export function useApexStore(selectedDate: Date) {
       bodyMeasurements: await db.bodyMeasurements.toArray(),
       shoppingItems: await db.shoppingItems.toArray(),
       chatMessages: await db.chatMessages.toArray(),
+      agendaNotes: await db.agendaNotes.toArray(),
+      sleepLogs: await db.sleepLogs.toArray(),
       photos: await db.photos.toArray(),
       settings: await db.settings.toArray()
     };
@@ -290,6 +337,10 @@ export function useApexStore(selectedDate: Date) {
     latestBody,
     shoppingItems,
     chatMessages,
+    agendaNotes,
+    selectedAgendaNote,
+    sleepLogs,
+    selectedSleep,
     photos,
     settings,
     isDone,
@@ -310,6 +361,10 @@ export function useApexStore(selectedDate: Date) {
     syncShoppingList,
     updateShoppingStatus,
     sendChatMessage,
+    clearChat,
+    saveAgendaNote,
+    saveSleepLog,
+    estimateFood,
     addPhoto,
     updateSettings,
     exportData,

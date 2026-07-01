@@ -1,5 +1,6 @@
 import { dateKey } from "@/lib/date";
-import type { ApexAlert, NutritionLog, ProductConsumption, ProductStockSummary, TaskCompletion, TimelineEvent, Workout } from "@/types/apex";
+import { formatSleepDuration } from "@/lib/sleep";
+import type { ApexAlert, NutritionLog, ProductConsumption, ProductStockSummary, SleepLog, TaskCompletion, TimelineEvent, Workout } from "@/types/apex";
 
 export function buildTimeline({
   completions,
@@ -7,7 +8,8 @@ export function buildTimeline({
   nutritionLogs,
   workouts,
   alerts,
-  stock
+  stock,
+  sleepLogs
 }: {
   completions: TaskCompletion[];
   consumptions: ProductConsumption[];
@@ -15,16 +17,20 @@ export function buildTimeline({
   workouts: Workout[];
   alerts: ApexAlert[];
   stock: ProductStockSummary[];
+  sleepLogs?: SleepLog[];
 }): TimelineEvent[] {
   const events: TimelineEvent[] = [];
   completions.filter((item) => item.done).forEach((item) => {
     events.push({ id: `routine-${item.id}`, dateKey: item.dateKey, title: "Rutina completada", detail: item.taskId, type: "routine" });
   });
   workouts.forEach((workout) => {
-    events.push({ id: `workout-${workout.id}`, dateKey: workout.dateKey, title: workout.title, detail: `${workout.focus} · ${workout.exercises.length} ejercicios`, type: "training" });
+    events.push({ id: `workout-${workout.id}`, dateKey: workout.dateKey, title: workout.title, detail: `${workout.focus} - ${workout.exercises.length} ejercicios`, type: "training" });
   });
   nutritionLogs.forEach((log) => {
-    events.push({ id: `nutrition-${log.id}`, dateKey: log.dateKey, title: `${Math.round(log.calories)} kcal`, detail: `${Math.round(log.protein)}P ${Math.round(log.carbs)}C ${Math.round(log.fat)}G · ${Math.round(log.waterMl / 1000)} L agua`, type: "nutrition" });
+    events.push({ id: `nutrition-${log.id}`, dateKey: log.dateKey, title: `${Math.round(log.calories)} kcal`, detail: `${Math.round(log.protein)}P ${Math.round(log.carbs)}C ${Math.round(log.fat)}G - ${Math.round(log.waterMl / 1000)} L agua`, type: "nutrition" });
+  });
+  sleepLogs?.forEach((log) => {
+    events.push({ id: `sleep-${log.id}`, dateKey: log.dateKey, title: "Sueno registrado", detail: `${log.sleepTime} a ${log.wakeTime} - ${formatSleepDuration(log.durationMinutes)}`, type: "routine" });
   });
   consumptions.forEach((item) => {
     const product = stock.find((summary) => summary.product.id === item.productId)?.product;

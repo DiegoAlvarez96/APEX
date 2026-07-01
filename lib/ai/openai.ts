@@ -1,10 +1,12 @@
-import type { AppSettings, NutritionLog, ProductStockSummary, Workout } from "@/types/apex";
+import { formatSleepDuration } from "@/lib/sleep";
+import type { AppSettings, NutritionLog, ProductStockSummary, SleepLog, Workout } from "@/types/apex";
 
 export type ApexAiContext = {
   settings: AppSettings;
   nutrition?: NutritionLog;
   stock: ProductStockSummary[];
   workouts: Workout[];
+  sleep?: SleepLog;
   habitsCompleted: number;
 };
 
@@ -33,6 +35,9 @@ export class LocalInsightProvider implements ApexAiProvider {
     }
     if (critical[0]) {
       recommendations.push({ category: "stock", title: "Stock critico", detail: `${critical[0].product.name} necesita reposicion pronto.` });
+    }
+    if (context.sleep && context.sleep.durationMinutes < 420) {
+      recommendations.push({ category: "habit", title: "Sueno corto", detail: `Dormiste ${formatSleepDuration(context.sleep.durationMinutes)}. Priorizaria recuperar descanso hoy.` });
     }
     if (context.workouts.length === 0) {
       recommendations.push({ category: "training", title: "Sin entrenamiento reciente", detail: "Registra la sesion para poder analizar volumen, frecuencia e intensidad." });

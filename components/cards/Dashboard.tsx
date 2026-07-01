@@ -7,7 +7,8 @@ import { ProgressRing } from "@/components/cards/ProgressRing";
 import { TaskList } from "@/components/cards/TaskList";
 import { prettyDate, slotForHour, slotLabel } from "@/lib/date";
 import { getRoutineForDate } from "@/lib/routines";
-import type { NutritionLog, ProductStockSummary, Workout } from "@/types/apex";
+import { formatSleepDuration } from "@/lib/sleep";
+import type { NutritionLog, ProductStockSummary, SleepLog, Workout } from "@/types/apex";
 
 export function Dashboard({
   selectedDate,
@@ -15,7 +16,8 @@ export function Dashboard({
   onToggle,
   nutrition,
   workouts,
-  stockSummaries
+  stockSummaries,
+  sleep
 }: {
   selectedDate: Date;
   isDone: (taskId: string) => boolean;
@@ -23,6 +25,7 @@ export function Dashboard({
   nutrition?: NutritionLog;
   workouts: Workout[];
   stockSummaries: ProductStockSummary[];
+  sleep?: SleepLog;
 }) {
   const routine = getRoutineForDate(selectedDate);
   const currentSlot = slotForHour(new Date());
@@ -61,6 +64,7 @@ export function Dashboard({
         <Metric icon={CalendarCheck} label="Stock critico" value={`${criticalStock}`} />
         <Metric icon={Droplets} label="Minoxidil oral" value={oral && isDone(oral.id) ? "Completo" : "Pendiente"} />
         <Metric icon={RollerCoaster} label="Suplementos" value={`${supplementsLeft}`} />
+        <Metric icon={CalendarCheck} label="Sueno" value={sleep ? formatSleepDuration(sleep.durationMinutes) : "-"} />
       </div>
 
       {(["morning", "afternoon", "night"] as const).map((slot) => (

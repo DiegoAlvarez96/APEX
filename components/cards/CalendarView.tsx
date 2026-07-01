@@ -1,7 +1,9 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui/Card";
+import { TaskList } from "@/components/cards/TaskList";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { addDays, dateKey, dayOfMonth, monthStart, monthTitle, weekdayInAppTimeZone } from "@/lib/date";
 import { buildAgendaDetail } from "@/lib/agenda";
@@ -14,7 +16,11 @@ export function CalendarView({
   mode,
   onModeChange,
   workouts,
-  stockSummaries
+  stockSummaries,
+  note,
+  onSaveNote,
+  isDone,
+  onToggle
 }: {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
@@ -22,8 +28,18 @@ export function CalendarView({
   onModeChange: (mode: "week" | "month") => void;
   workouts: Workout[];
   stockSummaries: ProductStockSummary[];
+  note?: string;
+  onSaveNote: (note: string) => void;
+  isDone: (taskId: string) => boolean;
+  onToggle: (taskId: string) => void;
 }) {
+  const [draftNote, setDraftNote] = useState(note ?? "");
   const detail = buildAgendaDetail(selectedDate, workouts.filter((workout) => workout.dateKey === dateKey(selectedDate)), stockSummaries);
+  const routine = getRoutineForDate(selectedDate);
+
+  useEffect(() => {
+    setDraftNote(note ?? "");
+  }, [note, selectedDate]);
   const days =
     mode === "week"
       ? Array.from({ length: 7 }, (_, index) => addDays(selectedDate, index - weekdayInAppTimeZone(selectedDate)))
@@ -87,6 +103,12 @@ export function CalendarView({
         <AgendaBlock title="Suplementos" items={detail.supplements} />
         <AgendaBlock title="Habitos" items={detail.habits} />
         <AgendaBlock title="Notas" items={detail.notes} />
+      </Card>
+      <Card>
+        <SectionTitle title="Corregir dia" eyebrow="Editable historicamente" />
+        <TaskList tasks={routine.tasks} isDone={isDone} onToggle={onToggle} />
+        <textarea className="mt-4 min-h-24 w-full rounded-3xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={draftNote} onChange={(event) => setDraftNote(event.target.value)} placeholder="Notas, correcciones, objetivos o actividades del dia" />
+        <button className="mt-3 h-11 w-full rounded-2xl bg-limeglass font-semibold text-black" type="button" onClick={() => onSaveNote(draftNote)}>Guardar nota</button>
       </Card>
     </div>
   );

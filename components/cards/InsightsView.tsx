@@ -4,19 +4,21 @@ import { BrainCircuit } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { createAiProvider, type ApexAiRecommendation } from "@/lib/ai/openai";
-import type { AppSettings, NutritionLog, ProductStockSummary, Workout } from "@/types/apex";
+import type { AppSettings, NutritionLog, ProductStockSummary, SleepLog, Workout } from "@/types/apex";
 
 export function InsightsView({
   settings,
   nutrition,
   stock,
   workouts,
+  sleep,
   habitsCompleted
 }: {
   settings: AppSettings;
   nutrition?: NutritionLog;
   stock: ProductStockSummary[];
   workouts: Workout[];
+  sleep?: SleepLog;
   habitsCompleted: number;
 }) {
   const [items, setItems] = useState<ApexAiRecommendation[]>([]);
@@ -24,7 +26,7 @@ export function InsightsView({
   useEffect(() => {
     let active = true;
     void createAiProvider()
-      .analyze({ settings, nutrition, stock, workouts, habitsCompleted })
+      .analyze({ settings, nutrition, stock, workouts, sleep, habitsCompleted })
       .then((next) => {
         if (active) setItems(next);
       })
@@ -34,7 +36,7 @@ export function InsightsView({
     return () => {
       active = false;
     };
-  }, [habitsCompleted, nutrition, settings, stock, workouts]);
+  }, [habitsCompleted, nutrition, settings, sleep, stock, workouts]);
 
   return (
     <div className="space-y-5">

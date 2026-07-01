@@ -20,9 +20,12 @@ export function summarizeProductStock(product: Product, consumptions: ProductCon
   const dated = productConsumptions.map((item) => item.dateKey).sort();
   const firstDate = dated[0] ?? product.purchaseDate;
   const daysWindow = Math.max(1, daysBetween(firstDate, dateKey()) + 1);
-  const dailyAverage = consumed > 0 ? consumed / daysWindow : 0;
-  const weeklyConsumption = productConsumptions.filter((item) => daysBetween(item.dateKey, dateKey()) <= 6).reduce((sum, item) => sum + item.amount, 0);
-  const monthlyConsumption = productConsumptions.filter((item) => daysBetween(item.dateKey, dateKey()) <= 29).reduce((sum, item) => sum + item.amount, 0);
+  const estimatedDaily = Math.max(product.dailyConsumptionEstimate ?? product.recommendedConsumption ?? 0, 0);
+  const dailyAverage = consumed > 0 ? consumed / daysWindow : estimatedDaily;
+  const weeklyConsumption =
+    consumed > 0 ? productConsumptions.filter((item) => daysBetween(item.dateKey, dateKey()) <= 6).reduce((sum, item) => sum + item.amount, 0) : estimatedDaily * 7;
+  const monthlyConsumption =
+    consumed > 0 ? productConsumptions.filter((item) => daysBetween(item.dateKey, dateKey()) <= 29).reduce((sum, item) => sum + item.amount, 0) : estimatedDaily * 30;
   const estimatedDaysLeft = dailyAverage > 0 ? Math.max(0, Math.floor(currentStock / dailyAverage)) : null;
   const estimatedRestockDate = estimatedDaysLeft === null ? null : dateKey(addDays(new Date(), estimatedDaysLeft));
 

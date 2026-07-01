@@ -5,6 +5,7 @@ export type AlertStatus = "active" | "buy" | "snoozed" | "ignored";
 export type AlertSeverity = "info" | "warning" | "critical";
 export type ProductGroup = "nutrition" | "personalCare" | "supplement" | "other";
 export type ShoppingStatus = "pending" | "bought" | "ignored";
+export type DrinkType = "water" | "soda" | "juice" | "isotonic" | "alcohol" | "other";
 
 export type RoutineTask = {
   id: string;
@@ -44,6 +45,8 @@ export type Product = {
   purchaseDate: string;
   cost: number;
   lowAt: number;
+  recommendedConsumption?: number;
+  dailyConsumptionEstimate?: number;
   createdAt: string;
 };
 
@@ -93,6 +96,8 @@ export type NutritionLog = {
   waterMl: number;
   weightKg?: number;
   meals?: FoodEntry[];
+  planItems?: NutritionPlanItem[];
+  drinks?: DrinkEntry[];
   createdAt: string;
   updatedAt: string;
 };
@@ -110,9 +115,33 @@ export type FoodEntry = {
   source: "text" | "autocomplete" | "photo";
 };
 
+export type NutritionPlanItem = {
+  id: string;
+  meal: "Desayuno" | "Almuerzo" | "Merienda" | "Cena";
+  name: string;
+  done: boolean;
+};
+
+export type DrinkEntry = {
+  id: string;
+  type: DrinkType;
+  amountMl: number;
+  label: string;
+};
+
+export type FoodCacheItem = {
+  id?: number;
+  key: string;
+  entry: FoodEntry;
+  createdAt: string;
+};
+
 export type WorkoutSet = {
   reps: number;
   weight?: number;
+  rir?: number;
+  restSeconds?: number;
+  completed?: boolean;
 };
 
 export type WorkoutExercise = {
@@ -120,6 +149,7 @@ export type WorkoutExercise = {
   name: string;
   sets: WorkoutSet[];
   notes?: string;
+  completed?: boolean;
 };
 
 export type Workout = {
@@ -167,6 +197,23 @@ export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+};
+
+export type AgendaNote = {
+  id?: number;
+  dateKey: string;
+  note: string;
+  updatedAt: string;
+};
+
+export type SleepLog = {
+  id?: number;
+  dateKey: string;
+  sleepTime: string;
+  wakeTime: string;
+  durationMinutes: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type TimelineEvent = {
