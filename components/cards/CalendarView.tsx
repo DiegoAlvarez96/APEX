@@ -5,10 +5,11 @@ import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { TaskList } from "@/components/cards/TaskList";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { addDays, dateKey, dayOfMonth, monthStart, monthTitle, weekdayInAppTimeZone } from "@/lib/date";
+import { addDays, dateKey, dayOfMonth, fullDate, monthStart, monthTitle, weekdayInAppTimeZone } from "@/lib/date";
 import { buildAgendaDetail } from "@/lib/agenda";
 import { getRoutineForDate } from "@/lib/routines";
-import type { ProductStockSummary, Workout } from "@/types/apex";
+import { formatSleepDuration } from "@/lib/sleep";
+import type { NutritionLog, ProductStockSummary, SleepLog, Workout } from "@/types/apex";
 
 export function CalendarView({
   selectedDate,
@@ -17,6 +18,8 @@ export function CalendarView({
   onModeChange,
   workouts,
   stockSummaries,
+  nutrition,
+  previousSleep,
   note,
   onSaveNote,
   isDone,
@@ -28,14 +31,21 @@ export function CalendarView({
   onModeChange: (mode: "week" | "month") => void;
   workouts: Workout[];
   stockSummaries: ProductStockSummary[];
+  nutrition?: NutritionLog;
+  previousSleep?: SleepLog;
   note?: string;
   onSaveNote: (note: string) => void;
   isDone: (taskId: string) => boolean;
   onToggle: (taskId: string) => void;
 }) {
   const [draftNote, setDraftNote] = useState(note ?? "");
-  const detail = buildAgendaDetail(selectedDate, workouts.filter((workout) => workout.dateKey === dateKey(selectedDate)), stockSummaries);
+  const selectedDateKey = dateKey(selectedDate);
+  const selectedDateLabel = fullDate(selectedDate);
+  const previousDateLabel = fullDate(addDays(selectedDate, -1));
+  const workoutsForDay = workouts.filter((workout) => workout.dateKey === selectedDateKey);
+  const detail = buildAgendaDetail(selectedDate, workoutsForDay, stockSummaries);
   const routine = getRoutineForDate(selectedDate);
+  const skincareTasks = routine.tasks.filter((task) => task.category === "skincare" || task.category === "beard" || task.category === "hair");
 
   useEffect(() => {
     setDraftNote(note ?? "");
@@ -76,7 +86,7 @@ export function CalendarView({
         </div>
         <div className="mt-3 grid grid-cols-7 gap-2">
           {days.map((day) => {
-            const active = dateKey(day) === dateKey(selectedDate);
+            const active = dateKey(day) === selectedDateKey;
             const routine = getRoutineForDate(day);
             return (
               <button
@@ -96,14 +106,29 @@ export function CalendarView({
       </Card>
 
       <Card>
-        <SectionTitle title={`Detalle ${dayOfMonth(selectedDate)}`} eyebrow="Agenda del dia" />
-        <AgendaBlock title="Rutina" items={detail.routine} />
-        <AgendaBlock title="Skincare manana" items={detail.morning} />
-        <AgendaBlock title="Skincare noche" items={detail.night} />
+        <SectionTitle title={`Dia ${selectedDateLabel}`} eyebrow="Detalle del dia" />
+        <div className="grid grid-cols-2 gap-2">
+          <AgendaMetric label="Skincare" value={`${skincareTasks.filter((task) => isDone(task.id)).length}/${skincareTasks.length}`} />
+          <AgendaMetric label="Nutricion" value={nutrition ? `${Math.round(nutrition.calories)} kcal` : "Sin cargar"} />
+          <AgendaMetric label="Entreno" value={workoutsForDay.length ? `${workoutsForDay.length}` : "Sin cargar"} />
+          <AgendaMetric label="Sueno ant." value={previousSleep ? formatSleepDuration(previousSleep.durationMinutes) : "Sin cargar"} />
+        </div>
         <AgendaBlock title="Suplementos" items={detail.supplements} />
         <AgendaBlock title="Habitos" items={detail.habits} />
         <AgendaBlock title="Notas" items={detail.notes} />
       </Card>
+
+      <Card>
+        <SectionTitle title="Skin care" eyebrow={selectedDateLabel} />
+        <TaskList tasks={skincareTasks} isDone={isDone} onToggle={onToggle} />
+      </Card>
+
+      <NutritionAgendaCard nutrition={nutrition} selectedDateLabel={selectedDateLabel} />
+
+      <TrainingAgendaCard workouts={workoutsForDay} selectedDateLabel={selectedDateLabel} />
+
+      <SleepAgendaCard sleep={previousSleep} previousDateLabel={previousDateLabel} />
+
       <Card>
         <SectionTitle title="Corregir dia" eyebrow="Editable historicamente" />
         <TaskList tasks={routine.tasks} isDone={isDone} onToggle={onToggle} />
@@ -111,6 +136,85 @@ export function CalendarView({
         <button className="mt-3 h-11 w-full rounded-2xl bg-limeglass font-semibold text-black" type="button" onClick={() => onSaveNote(draftNote)}>Guardar nota</button>
       </Card>
     </div>
+  );
+}
+
+function AgendaMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white/[0.06] p-3 light:bg-black/[0.04]">
+      <p className="text-[11px] text-white/40 light:text-black/40">{label}</p>
+      <p className="mt-1 truncate text-sm font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function NutritionAgendaCard({ nutrition, selectedDateLabel }: { nutrition?: NutritionLog; selectedDateLabel: string }) {
+  const planTotal = nutrition?.planItems?.length ?? 0;
+  const planDone = nutrition?.planItems?.filter((item) => item.done).length ?? 0;
+  return (
+    <Card>
+      <SectionTitle title="Nutricion" eyebrow={selectedDateLabel} />
+      {nutrition ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <AgendaMetric label="Calorias" value={`${Math.round(nutrition.calories)} kcal`} />
+            <AgendaMetric label="Proteina" value={`${Math.round(nutrition.protein)} g`} />
+            <AgendaMetric label="Carbos" value={`${Math.round(nutrition.carbs)} g`} />
+            <AgendaMetric label="Agua" value={`${(nutrition.waterMl / 1000).toFixed(1)} L`} />
+          </div>
+          <p className="text-sm text-white/50 light:text-black/50">Plan: {planDone}/{planTotal || "-"} items completados.</p>
+          {nutrition.meals?.slice(0, 5).map((meal) => (
+            <div key={meal.id} className="rounded-2xl bg-white/[0.06] px-3 py-2 text-sm light:bg-black/[0.04]">
+              {meal.name} - {Math.round(meal.calories)} kcal
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-white/45 light:text-black/45">Todavia no hay nutricion guardada para este dia.</p>
+      )}
+    </Card>
+  );
+}
+
+function TrainingAgendaCard({ workouts, selectedDateLabel }: { workouts: Workout[]; selectedDateLabel: string }) {
+  return (
+    <Card>
+      <SectionTitle title="Entrenamiento" eyebrow={selectedDateLabel} />
+      {workouts.length ? (
+        <div className="space-y-3">
+          {workouts.map((workout) => (
+            <div key={workout.id} className="rounded-2xl bg-white/[0.06] p-3 light:bg-black/[0.04]">
+              <p className="text-sm font-semibold">{workout.title}</p>
+              <p className="mt-1 text-xs text-white/45 light:text-black/45">{workout.focus} - intensidad {workout.intensity} - {workout.exercises.length} ejercicios</p>
+              {workout.exercises.slice(0, 4).map((exercise) => (
+                <p key={exercise.id} className="mt-2 text-xs text-white/55 light:text-black/55">
+                  {exercise.name} - {exercise.sets.length} series
+                </p>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-white/45 light:text-black/45">No hay entrenamiento registrado para este dia.</p>
+      )}
+    </Card>
+  );
+}
+
+function SleepAgendaCard({ sleep, previousDateLabel }: { sleep?: SleepLog; previousDateLabel: string }) {
+  return (
+    <Card>
+      <SectionTitle title="Sueno del dia anterior" eyebrow={previousDateLabel} />
+      {sleep ? (
+        <div className="grid grid-cols-3 gap-2">
+          <AgendaMetric label="Dormir" value={sleep.sleepTime} />
+          <AgendaMetric label="Despertar" value={sleep.wakeTime} />
+          <AgendaMetric label="Duracion" value={formatSleepDuration(sleep.durationMinutes)} />
+        </div>
+      ) : (
+        <p className="text-sm text-white/45 light:text-black/45">No hay sueno registrado para {previousDateLabel}.</p>
+      )}
+    </Card>
   );
 }
 

@@ -42,6 +42,16 @@ export function prettyDate(date = new Date()) {
   }).format(date);
 }
 
+export function fullDate(date = new Date()) {
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: APP_TIME_ZONE,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  }).format(date);
+}
+
 export function slotForHour(date = new Date()): RoutineSlot {
   const { hour } = zonedParts(date);
   if (hour < 12) return "morning";
@@ -107,4 +117,9 @@ export function formatDate(date: Date | string) {
 export function formatDateKey(key: string) {
   const [year, month, day] = key.split("-").map(Number);
   return formatDate(new Date(Date.UTC(year, month - 1, day, 12)));
+}
+
+export function fullDateKey(key: string) {
+  const [year, month, day] = key.split("-").map(Number);
+  return fullDate(new Date(Date.UTC(year, month - 1, day, 12)));
 }

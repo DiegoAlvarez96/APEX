@@ -21,15 +21,19 @@ import { TrainingSmartView } from "@/components/cards/TrainingSmartView";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { BottomNav, type ViewKey } from "@/components/layout/BottomNav";
 import { useApexStore } from "@/hooks/useApexStore";
-import { dateKey, hourInAppTimeZone } from "@/lib/date";
+import { addDays, dateKey, hourInAppTimeZone } from "@/lib/date";
 import { buildTimeline } from "@/lib/timeline";
 import { useEffect } from "react";
 
 export default function Home() {
-  const [view, setView] = useState<ViewKey>(() => initialViewForNow());
+  const [view, setView] = useState<ViewKey>("home");
+  const [smartOpened, setSmartOpened] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [calendarMode, setCalendarMode] = useState<"week" | "month">("week");
   const store = useApexStore(selectedDate);
+  const selectedDateKey = dateKey(selectedDate);
+  const previousDateKey = dateKey(addDays(selectedDate, -1));
+  const previousSleep = store.sleepLogs.find((log) => log.dateKey === previousDateKey);
   const timeline = buildTimeline({
     completions: store.allCompletions,
     consumptions: store.productConsumptions,
@@ -42,8 +46,11 @@ export default function Home() {
   const habitsCompleted = store.completions.filter((item) => item.done).length;
 
   useEffect(() => {
-    if (store.ready && view === "sleep" && store.selectedSleep) setView("home");
-  }, [store.ready, store.selectedSleep, view]);
+    if (!store.ready || smartOpened) return;
+    const nextView = initialViewForNow();
+    setView(nextView === "sleep" && store.selectedSleep ? "home" : nextView);
+    setSmartOpened(true);
+  }, [smartOpened, store.ready, store.selectedSleep]);
 
   const screen = {
     home: <HomeView onNavigate={setView} />,
@@ -58,8 +65,8 @@ export default function Home() {
         sleep={store.selectedSleep}
       />
     ),
-    calendar: <CalendarView selectedDate={selectedDate} onSelectDate={setSelectedDate} mode={calendarMode} onModeChange={setCalendarMode} workouts={store.workouts} stockSummaries={store.stockSummaries} note={store.selectedAgendaNote?.note} onSaveNote={(note) => void store.saveAgendaNote(note)} isDone={store.isDone} onToggle={(id) => void store.toggleTask(id)} />,
-    nutrition: <NutritionSmartView nutrition={store.selectedNutrition} selectedDateKey={dateKey(selectedDate)} onSave={(values) => void store.upsertNutritionLog(values)} onDelete={(id) => void store.deleteNutritionLog(id)} onEstimateFood={store.estimateFood} />,
+    calendar: <CalendarView selectedDate={selectedDate} onSelectDate={setSelectedDate} mode={calendarMode} onModeChange={setCalendarMode} workouts={store.workouts} stockSummaries={store.stockSummaries} nutrition={store.selectedNutrition} previousSleep={previousSleep} note={store.selectedAgendaNote?.note} onSaveNote={(note) => void store.saveAgendaNote(note)} isDone={store.isDone} onToggle={(id) => void store.toggleTask(id)} />,
+    nutrition: <NutritionSmartView nutrition={store.selectedNutrition} selectedDateKey={selectedDateKey} onSave={(values) => void store.upsertNutritionLog(values)} onDelete={(id) => void store.deleteNutritionLog(id)} onEstimateFood={store.estimateFood} />,
     training: <TrainingSmartView workouts={store.workouts} onAddWorkout={(workout) => void store.addWorkout(workout)} onUpdateWorkout={(id, workout) => void store.updateWorkout(id, workout)} onDeleteWorkout={(id) => void store.deleteWorkout(id)} onDuplicateWorkout={(workout) => void store.duplicateWorkout(workout)} />,
     physical: <PhysicalView latest={store.latestBody} measurements={store.bodyMeasurements} onSave={(value) => void store.addBodyMeasurement(value)} />,
     health: <HealthAestheticView />,
