@@ -220,7 +220,21 @@ export function useApexStore(selectedDate: Date) {
 
   const sendChatMessage = useCallback(async (content: string) => {
     await db.chatMessages.add({ role: "user", content, createdAt: new Date().toISOString() });
-    const answer = answerLocalChat(content, { nutrition: selectedNutrition, stock: stockSummaries, workouts, body: latestBody });
+    const context = { nutrition: selectedNutrition, stock: stockSummaries, workouts, body: latestBody };
+    let answer = answerLocalChat(content, context);
+    try {
+      const response = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: content, context })
+      });
+      if (response.ok) {
+        const data = (await response.json()) as { answer?: string };
+        answer = data.answer?.trim() || answer;
+      }
+    } catch {
+      answer = answerLocalChat(content, context);
+    }
     await db.chatMessages.add({ role: "assistant", content: answer, createdAt: new Date().toISOString() });
     await refresh();
   }, [latestBody, refresh, selectedNutrition, stockSummaries, workouts]);
