@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1170 2532">
+  <rect width="1170" height="2532" fill="#07080a"/>
+  <circle cx="190" cy="40" r="520" fill="#1f766f" opacity=".28"/>
+  <text x="82" y="240" fill="#f8fafc" font-family="Arial" font-size="92" font-weight="700">APEX</text>
+  <rect x="72" y="360" width="1026" height="360" rx="72" fill="#ffffff" opacity=".09"/>
+  <circle cx="878" cy="540" r="124" fill="#d8ff64"/>
+  <text x="132" y="500" fill="#f8fafc" font-family="Arial" font-size="56" font-weight="700">Rutina de hoy</text>
+  <text x="132" y="590" fill="#f8fafc" opacity=".65" font-family="Arial" font-size="36">Skincare, barba y habitos</text>
+  <rect x="72" y="800" width="1026" height="1180" rx="72" fill="#ffffff" opacity=".08"/>
+</svg>
