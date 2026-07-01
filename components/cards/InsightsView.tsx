@@ -23,7 +23,7 @@ export function InsightsView({
 
   useEffect(() => {
     let active = true;
-    void createAiProvider(settings)
+    void createAiProvider()
       .analyze({ settings, nutrition, stock, workouts, habitsCompleted })
       .then((next) => {
         if (active) setItems(next);
@@ -43,7 +43,7 @@ export function InsightsView({
         <h1 className="text-3xl font-semibold">IA APEX</h1>
       </header>
       <Card>
-        <SectionTitle eyebrow={settings.openAiApiKey ? "OpenAI conectado" : "Motor local"} title="Recomendaciones" />
+        <SectionTitle eyebrow="OPENAI_API_KEY" title="Recomendaciones" />
         <div className="space-y-3">
           {items.map((item) => (
             <div key={`${item.category}-${item.title}`} className="flex gap-3 rounded-2xl bg-white/[0.06] p-3 light:bg-black/[0.04]">

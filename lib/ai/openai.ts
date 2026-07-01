@@ -43,40 +43,25 @@ export class LocalInsightProvider implements ApexAiProvider {
 }
 
 export class OpenAiInsightProvider implements ApexAiProvider {
-  constructor(private readonly apiKey: string, private readonly model = "gpt-4.1-mini") {}
+  constructor(private readonly model = "gpt-4.1-mini") {}
 
   async analyze(context: ApexAiContext): Promise<ApexAiRecommendation[]> {
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetch("/api/ai/insights", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         model: this.model,
-        input: [
-          {
-            role: "system",
-            content: "Sos APEX, un asistente personal breve para nutricion, entrenamiento, stock y habitos. Responde JSON estricto."
-          },
-          {
-            role: "user",
-            content: JSON.stringify({
-              schema: "Array<{title:string,detail:string,category:'nutrition'|'training'|'stock'|'habit'}>",
-              context
-            })
-          }
-        ]
+        context
       })
     });
 
     if (!response.ok) throw new Error("OpenAI request failed");
-    const data = await response.json();
-    const text = data.output_text ?? "[]";
-    return JSON.parse(text) as ApexAiRecommendation[];
+    return (await response.json()) as ApexAiRecommendation[];
   }
 }
 
-export function createAiProvider(settings: AppSettings): ApexAiProvider {
-  return settings.openAiApiKey ? new OpenAiInsightProvider(settings.openAiApiKey) : new LocalInsightProvider();
+export function createAiProvider(): ApexAiProvider {
+  return new OpenAiInsightProvider();
 }

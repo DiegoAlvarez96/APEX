@@ -192,7 +192,6 @@ export type AppSettings = {
   nightReminder: string;
   dermarollerReminder: boolean;
   notificationsEnabled: boolean;
-  openAiApiKey?: string;
   nutritionGoal?: string;
   trainingGoal?: string;
 };

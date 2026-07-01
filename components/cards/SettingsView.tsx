@@ -91,16 +91,9 @@ export function SettingsView({
       <Card>
         <SectionTitle title="IA y objetivos" eyebrow="Preparado para OpenAI" />
         <div className="space-y-3">
-          <label className="block rounded-2xl bg-white/[0.06] p-4 light:bg-black/[0.04]">
-            <span className="text-xs text-white/45 light:text-black/45">OpenAI API key</span>
-            <input
-              className="mt-1 w-full bg-transparent text-sm outline-none"
-              type="password"
-              value={settings.openAiApiKey ?? ""}
-              onChange={(event) => onUpdateSettings({ openAiApiKey: event.target.value || undefined })}
-              placeholder="sk-..."
-            />
-          </label>
+          <div className="rounded-2xl bg-white/[0.06] p-4 text-sm text-white/55 light:bg-black/[0.04] light:text-black/55">
+            La API key se toma desde la variable de entorno <span className="font-semibold">OPENAI_API_KEY</span>.
+          </div>
           <label className="block rounded-2xl bg-white/[0.06] p-4 light:bg-black/[0.04]">
             <span className="text-xs text-white/45 light:text-black/45">Objetivo nutricion</span>
             <textarea
