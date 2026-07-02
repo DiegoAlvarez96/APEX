@@ -1,14 +1,15 @@
 "use client";
 
-import { CalendarDays, Dumbbell, Home, Package, ShoppingCart, UserRound, Utensils } from "lucide-react";
+import { CalendarDays, Dumbbell, Home, Package, ShoppingCart, Sparkles, UserRound, Utensils } from "lucide-react";
 
 export type ViewKey = "home" | "dashboard" | "calendar" | "nutrition" | "training" | "physical" | "health" | "products" | "shopping" | "alerts" | "timeline" | "ai" | "chat" | "stats" | "settings" | "sleep";
 
 const items = [
   { key: "home", label: "Inicio", icon: Home },
   { key: "calendar", label: "Agenda", icon: CalendarDays },
+  { key: "dashboard", label: "Skincare", icon: Sparkles },
   { key: "nutrition", label: "Nutri", icon: Utensils },
-  { key: "training", label: "Train", icon: Dumbbell },
+  { key: "training", label: "Entrenamiento", icon: Dumbbell },
   { key: "physical", label: "Fisico", icon: UserRound },
   { key: "shopping", label: "Compras", icon: ShoppingCart },
   { key: "products", label: "Stock", icon: Package }
@@ -26,13 +27,13 @@ export function BottomNav({ active, onChange }: { active: ViewKey; onChange: (vi
               key={item.key}
               type="button"
               onClick={() => onChange(item.key)}
-              className={`flex h-14 w-[4.25rem] shrink-0 flex-col items-center justify-center gap-1 rounded-2xl text-[11px] font-medium transition ${
+              className={`flex h-14 w-[5.4rem] shrink-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[10px] font-medium transition ${
                 isActive ? "bg-white text-black light:bg-black light:text-white" : "text-white/55 light:text-black/50"
               }`}
               aria-label={item.label}
             >
               <Icon size={19} strokeWidth={isActive ? 2.5 : 2} />
-              <span>{item.label}</span>
+              <span className="max-w-full truncate">{item.label}</span>
             </button>
           );
         })}
