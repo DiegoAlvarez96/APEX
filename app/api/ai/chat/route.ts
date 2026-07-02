@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
 import { answerLocalChat } from "@/lib/chat";
-import type { BodyMeasurement, ChatMessage, NutritionLog, ProductStockSummary, SleepLog, Workout } from "@/types/apex";
+import type { ChatMessage } from "@/types/apex";
 
 export const runtime = "nodejs";
 
-type ChatContext = {
-  nutrition?: NutritionLog;
-  stock: ProductStockSummary[];
-  workouts: Workout[];
-  body?: BodyMeasurement;
-  sleep?: SleepLog;
-};
+type ChatContext = Record<string, unknown>;
 
 export async function POST(request: Request) {
   const body = (await request.json()) as { message?: string; context?: ChatContext; history?: ChatMessage[] };
@@ -40,11 +34,11 @@ export async function POST(request: Request) {
         {
           role: "system",
           content:
-            "Sos APEX, un asistente personal premium. Responde en espanol rioplatense, breve y accionable. Usa solo el contexto recibido. No inventes datos medicos; para implante/cabello, segui indicaciones medicas como referencia de seguimiento, no reemplazo."
+            "Sos APEX Chat, un asistente tipo ChatGPT conectado a una app personal. Podes responder consultas generales de programacion, viajes, trabajo, ideas, salud general y cualquier tema. Cuando el usuario pregunte por su vida, rutinas, nutricion, stock, fisico, compras o habitos, usa el contexto APEX recibido. No inventes datos personales que no esten en el contexto. Para salud, da informacion general y recomienda profesional cuando corresponda."
         },
         {
           role: "user",
-          content: JSON.stringify({ pregunta: message, historialConversacion: body.history ?? [], contexto: context })
+          content: JSON.stringify({ contextoPermanenteApex: context, historialConversacionActual: body.history ?? [], preguntaActual: message })
         }
       ]
     })

@@ -3,13 +3,29 @@
 import { Moon, Save } from "lucide-react";
 import { useState } from "react";
 import { Card, SectionTitle } from "@/components/ui/Card";
+import { InlineStatus, LoadingButton } from "@/components/ui/Loading";
 import { calculateSleepDuration, formatSleepDuration } from "@/lib/sleep";
 import type { SleepLog } from "@/types/apex";
 
-export function SleepView({ sleep, onSave }: { sleep?: SleepLog; onSave: (sleepTime: string, wakeTime: string) => void }) {
+export function SleepView({ sleep, onSave }: { sleep?: SleepLog; onSave: (sleepTime: string, wakeTime: string) => Promise<void> | void }) {
   const [sleepTime, setSleepTime] = useState(sleep?.sleepTime ?? "00:00");
   const [wakeTime, setWakeTime] = useState(sleep?.wakeTime ?? "08:30");
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<{ message?: string; tone?: "info" | "success" | "error" }>({});
   const duration = calculateSleepDuration(sleepTime, wakeTime);
+
+  async function save() {
+    setLoading(true);
+    setStatus({ message: "Guardando sueno...", tone: "info" });
+    try {
+      await onSave(sleepTime, wakeTime);
+      setStatus({ message: "Sueno guardado.", tone: "success" });
+    } catch {
+      setStatus({ message: "No se pudo guardar el sueno.", tone: "error" });
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -36,9 +52,10 @@ export function SleepView({ sleep, onSave }: { sleep?: SleepLog; onSave: (sleepT
             <p className="text-2xl font-semibold">{formatSleepDuration(duration)}</p>
           </div>
         </div>
-        <button className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" onClick={() => onSave(sleepTime, wakeTime)} type="button">
+        <LoadingButton loading={loading} loadingLabel="Guardando..." className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" onClick={() => void save()}>
           <Save size={18} /> Guardar sueno
-        </button>
+        </LoadingButton>
+        <div className="mt-3"><InlineStatus message={status.message} tone={status.tone} /></div>
         {sleep ? <p className="mt-3 text-center text-sm text-white/45 light:text-black/45">Ya cargaste el sueno de este dia. No se vuelve a preguntar salvo que lo edites.</p> : null}
       </Card>
     </div>

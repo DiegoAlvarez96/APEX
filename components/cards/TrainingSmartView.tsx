@@ -1,29 +1,43 @@
 "use client";
 
 import { Check, Copy, Dumbbell, Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui/Card";
-import type { Workout, WorkoutExercise } from "@/types/apex";
+import { InlineStatus, LoadingButton } from "@/components/ui/Loading";
+import { cloneTemplateExercises, defaultWorkoutTemplates } from "@/lib/trainingTemplates";
+import type { Workout, WorkoutExercise, WorkoutTemplate } from "@/types/apex";
 
 export function TrainingSmartView({
   workouts,
   onAddWorkout,
   onUpdateWorkout,
   onDeleteWorkout,
-  onDuplicateWorkout
+  onDuplicateWorkout,
+  templates,
+  onAddTemplate,
+  onDeleteTemplate
 }: {
   workouts: Workout[];
-  onAddWorkout: (workout: Omit<Workout, "id" | "dateKey" | "createdAt">) => void;
-  onUpdateWorkout: (id: number, workout: Partial<Workout>) => void;
-  onDeleteWorkout: (id: number) => void;
-  onDuplicateWorkout: (workout: Workout) => void;
+  onAddWorkout: (workout: Omit<Workout, "id" | "dateKey" | "createdAt">) => Promise<void> | void;
+  onUpdateWorkout: (id: number, workout: Partial<Workout>) => Promise<void> | void;
+  onDeleteWorkout: (id: number) => Promise<void> | void;
+  onDuplicateWorkout: (workout: Workout) => Promise<void> | void;
+  templates: WorkoutTemplate[];
+  onAddTemplate: (template: Omit<WorkoutTemplate, "id" | "createdAt" | "updatedAt">) => Promise<void> | void;
+  onDeleteTemplate: (id: number) => Promise<void> | void;
 }) {
   const [editing, setEditing] = useState<Workout>();
   const [title, setTitle] = useState("Espalda");
   const [focus, setFocus] = useState("Fuerza");
   const [intensity, setIntensity] = useState<Workout["intensity"]>(4);
   const [notes, setNotes] = useState("");
+  const [group, setGroup] = useState("Espalda");
+  const [loading, setLoading] = useState<"workout" | "template" | undefined>();
+  const [status, setStatus] = useState<{ message?: string; tone?: "info" | "success" | "error" }>({});
   const [rawExercises, setRawExercises] = useState("Dominadas 4x10x0 rir2 rest90\nRemo con barra 4x12x40 rir2 rest90\nJalon al pecho 4x10x45 rir2 rest75\nPullover 3x15x20 rir1 rest60\nPeso muerto 4x8x80 rir2 rest120");
+  const allTemplates = useMemo(() => [...templates, ...defaultWorkoutTemplates], [templates]);
+  const groups = Array.from(new Set(allTemplates.map((template) => template.group)));
+  const groupTemplates = allTemplates.filter((template) => template.group === group);
   const preview = parseExercises(rawExercises);
 
   function load(workout: Workout) {
@@ -35,18 +49,70 @@ export function TrainingSmartView({
     setRawExercises(workout.exercises.map((exercise) => `${exercise.name} ${exercise.sets.length}x${exercise.sets[0]?.reps ?? 10}x${exercise.sets[0]?.weight ?? 0} rir${exercise.sets[0]?.rir ?? 2} rest${exercise.sets[0]?.restSeconds ?? 90}`).join("\n"));
   }
 
-  function submit() {
+  function applyTemplate(template: WorkoutTemplate) {
+    setTitle(template.group);
+    setFocus(template.focus);
+    setIntensity(template.intensity);
+    setNotes(template.notes ?? "");
+    setRawExercises(templateToRaw(template));
+    setStatus({ message: `${template.name} cargada. Podes editar antes de guardar.`, tone: "success" });
+  }
+
+  async function submit() {
     const exercises = parseExercises(rawExercises);
     if (!title.trim() || exercises.length === 0) return;
     const payload = { title, focus, intensity, notes, exercises };
-    if (editing?.id) onUpdateWorkout(editing.id, payload);
-    else onAddWorkout(payload);
-    setEditing(undefined);
+    setLoading("workout");
+    setStatus({ message: editing ? "Guardando cambios..." : "Guardando entrenamiento...", tone: "info" });
+    try {
+      if (editing?.id) await onUpdateWorkout(editing.id, payload);
+      else await onAddWorkout(payload);
+      setEditing(undefined);
+      setStatus({ message: "Entrenamiento guardado.", tone: "success" });
+    } catch {
+      setStatus({ message: "No se pudo guardar el entrenamiento.", tone: "error" });
+    } finally {
+      setLoading(undefined);
+    }
+  }
+
+  async function saveTemplate() {
+    const exercises = parseExercises(rawExercises);
+    if (!title.trim() || exercises.length === 0) return;
+    setLoading("template");
+    setStatus({ message: "Guardando plantilla...", tone: "info" });
+    try {
+      await onAddTemplate({ name: `${title} personalizada`, group: title, focus, intensity, notes, exercises, source: "user" });
+      setStatus({ message: "Plantilla guardada.", tone: "success" });
+    } catch {
+      setStatus({ message: "No se pudo guardar la plantilla.", tone: "error" });
+    } finally {
+      setLoading(undefined);
+    }
   }
 
   return (
     <div className="space-y-5">
       <header className="px-1 pt-2"><p className="text-sm text-white/45 light:text-black/45">Diario de gimnasio</p><h1 className="text-3xl font-semibold">Entrenamiento</h1></header>
+      <Card>
+        <SectionTitle title="Plantillas" eyebrow="Carga rapida" />
+        <div className="grid gap-3">
+          <select className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={group} onChange={(event) => setGroup(event.target.value)}>
+            {groups.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <div className="grid gap-2">
+            {groupTemplates.map((template) => (
+              <div key={`${template.source}-${template.id ?? template.name}`} className="flex items-center justify-between gap-2 rounded-2xl bg-white/[0.06] p-3 text-sm light:bg-black/[0.04]">
+                <button className="min-w-0 flex-1 text-left" type="button" onClick={() => applyTemplate(template)}>
+                  <span className="block font-semibold">{template.name}</span>
+                  <span className="text-xs text-white/45 light:text-black/45">{template.focus} - {template.exercises.length} ejercicios</span>
+                </button>
+                {template.source === "user" && template.id ? <button type="button" onClick={() => void onDeleteTemplate(template.id!)}><Trash2 size={16} /></button> : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
       <Card>
         <SectionTitle title={editing ? "Editar sesion" : "Registrar sesion"} eyebrow="Peso, reps, RIR y descanso" />
         <div className="grid gap-3">
@@ -60,7 +126,11 @@ export function TrainingSmartView({
           <textarea className="min-h-36 rounded-3xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={rawExercises} onChange={(event) => setRawExercises(event.target.value)} />
           <p className="text-xs leading-5 text-white/45 light:text-black/45">Formato: ejercicio series x reps x peso, RIR opcional y descanso. Ejemplo: Remo 4x12x40 rir2 rest90.</p>
           <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" placeholder="Observaciones" value={notes} onChange={(event) => setNotes(event.target.value)} />
-          <button className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" onClick={submit} type="button"><Plus size={18} /> {editing ? "Guardar cambios" : "Guardar entrenamiento"}</button>
+          <div className="grid grid-cols-2 gap-2">
+            <LoadingButton loading={loading === "workout"} loadingLabel="Guardando..." className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" onClick={() => void submit()}><Plus size={18} /> {editing ? "Guardar cambios" : "Guardar entrenamiento"}</LoadingButton>
+            <LoadingButton loading={loading === "template"} loadingLabel="Guardando..." className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-white text-black" onClick={() => void saveTemplate()}><Copy size={18} /> Guardar plantilla</LoadingButton>
+          </div>
+          <InlineStatus message={status.message} tone={status.tone} />
         </div>
       </Card>
       <Card>
@@ -102,6 +172,10 @@ export function TrainingSmartView({
       </div>
     </div>
   );
+}
+
+function templateToRaw(template: WorkoutTemplate) {
+  return cloneTemplateExercises(template).map((exercise) => `${exercise.name} ${exercise.sets.length}x${exercise.sets[0]?.reps ?? 10}x${exercise.sets[0]?.weight ?? 0} rir${exercise.sets[0]?.rir ?? 2} rest${exercise.sets[0]?.restSeconds ?? 90}`).join("\n");
 }
 
 function Action({ icon: Icon, label, onClick }: { icon: typeof Pencil; label: string; onClick: () => void }) {

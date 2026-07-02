@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Card, SectionTitle } from "@/components/ui/Card";
+import { InlineStatus, LoadingButton } from "@/components/ui/Loading";
 import { dateKey, formatDateKey } from "@/lib/date";
 import { productSuggestions, productTemplates, type ProductTemplate } from "@/lib/shopping";
 import { formatAmount, productDisplayName, productInitialStock, stockColor } from "@/lib/stock";
@@ -34,20 +35,31 @@ export function ProductsSmartView({
   onAddConsumption
 }: {
   summaries: ProductStockSummary[];
-  onAddProduct: (product: Omit<Product, "id" | "createdAt">) => void;
+  onAddProduct: (product: Omit<Product, "id" | "createdAt">) => Promise<void> | void;
   onAddConsumption: (productId: number, amount: number, note?: string) => void;
 }) {
   const [image, setImage] = useState<string>();
   const [group, setGroup] = useState<ProductGroup>("nutrition");
+  const [loading, setLoading] = useState<"image" | "save" | undefined>();
+  const [status, setStatus] = useState<{ message?: string; tone?: "info" | "success" | "error" }>({});
   const { register, handleSubmit, reset, setValue } = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
     defaultValues: { unit: "g", purchaseDate: dateKey(), lowAt: 20, cost: 0, initialStock: 100, size: 100 }
   });
 
-  function submit(values: ProductForm) {
-    onAddProduct({ ...values, group, image, quantity: values.initialStock });
-    setImage(undefined);
-    reset();
+  async function submit(values: ProductForm) {
+    setLoading("save");
+    setStatus({ message: "Guardando producto...", tone: "info" });
+    try {
+      await onAddProduct({ ...values, group, image, quantity: values.initialStock });
+      setImage(undefined);
+      reset();
+      setStatus({ message: "Producto guardado.", tone: "success" });
+    } catch {
+      setStatus({ message: "No se pudo guardar el producto.", tone: "error" });
+    } finally {
+      setLoading(undefined);
+    }
   }
 
   async function handleImage(file: File | null) {
@@ -56,12 +68,21 @@ export function ProductsSmartView({
     reader.onload = async () => {
       if (typeof reader.result !== "string") return;
       setImage(reader.result);
-      const response = await fetch("/api/ai/vision/product", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: reader.result })
-      });
-      if (response.ok) applyTemplate(await response.json() as ProductTemplate & { image?: string });
+      setLoading("image");
+      setStatus({ message: "Analizando producto...", tone: "info" });
+      try {
+        const response = await fetch("/api/ai/vision/product", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: reader.result })
+        });
+        if (response.ok) applyTemplate(await response.json() as ProductTemplate & { image?: string });
+        setStatus({ message: "Producto detectado.", tone: "success" });
+      } catch {
+        setStatus({ message: "No se pudo analizar la imagen.", tone: "error" });
+      } finally {
+        setLoading(undefined);
+      }
     };
     reader.readAsDataURL(file);
   }
@@ -150,9 +171,10 @@ export function ProductsSmartView({
               <input className="mt-1 w-full bg-transparent outline-none" type="number" placeholder="Consumo diario estimado" {...register("dailyConsumptionEstimate")} />
             </HelpField>
           </div>
-          <button className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" type="submit">
+          <LoadingButton loading={loading === "save"} loadingLabel="Guardando..." className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" type="submit">
             <PackagePlus size={18} /> Guardar producto
-          </button>
+          </LoadingButton>
+          <InlineStatus message={loading === "image" ? "Analizando imagen..." : status.message} tone={status.tone} />
         </form>
       </Card>
 

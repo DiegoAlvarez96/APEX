@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Dumbbell, HeartPulse, ListChecks, Package, ShoppingCart, Sparkles, UserRound, Utensils } from "lucide-react";
+import { CalendarDays, Dumbbell, ListChecks, Package, ShoppingCart, Sparkles, UserRound, Utensils } from "lucide-react";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import type { ViewKey } from "@/components/layout/BottomNav";
 
@@ -11,8 +11,7 @@ const modules = [
   { view: "training", title: "Entrenamiento", detail: "Diario de gimnasio", icon: Dumbbell },
   { view: "physical", title: "Mi fisico", detail: "Medidas y fotos", icon: UserRound },
   { view: "products", title: "Stock", detail: "Inventario inteligente", icon: Package },
-  { view: "shopping", title: "Compras", detail: "Lista inteligente", icon: ShoppingCart },
-  { view: "health", title: "Salud", detail: "Compras sugeridas", icon: HeartPulse },
+  { view: "shopping", title: "Compras", detail: "Lista inteligente y sugerencias IA", icon: ShoppingCart },
   { view: "timeline", title: "Historial", detail: "Actividad diaria", icon: ListChecks }
 ] satisfies { view: ViewKey; title: string; detail: string; icon: typeof Sparkles }[];
 

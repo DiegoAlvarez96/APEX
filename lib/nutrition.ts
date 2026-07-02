@@ -34,6 +34,16 @@ export function parseFoodText(value: string): FoodEntry[] {
     });
 }
 
+export function parseFoodQuery(value: string) {
+  const normalized = value.trim();
+  const match = normalized.match(/(\d+(?:[.,]\d+)?)\s*(gramos|gramo|gr|g|ml|cc|l|unidad|unidades|u)\b/i);
+  const amount = match ? Number(match[1].replace(",", ".")) : undefined;
+  const rawUnit = match?.[2]?.toLowerCase();
+  const unit = rawUnit ? ({ gramos: "g", gramo: "g", gr: "g", g: "g", ml: "ml", cc: "ml", l: "l", unidad: "un", unidades: "un", u: "un" }[rawUnit] ?? rawUnit) : undefined;
+  const name = normalized.replace(match?.[0] ?? "", "").replace(/\bde\b/gi, "").replace(/\s+/g, " ").trim() || normalized;
+  return { name, amount, unit, amountLabel: amount && unit ? `${amount} ${unit}` : undefined };
+}
+
 export function estimatePhotoFoods(): FoodEntry[] {
   return [
     toFoodEntry(matchPreset("pollo"), "photo", "Pollo estimado"),
@@ -61,16 +71,23 @@ function matchPreset(name: string) {
 }
 
 export function unknownFoodEntry(name: string): FoodEntry {
+  const parsed = parseFoodQuery(name);
   return {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    name,
+    name: parsed.name,
+    inputText: name,
+    amount: parsed.amount,
+    unit: parsed.unit,
+    amountLabel: parsed.amountLabel,
     calories: 0,
     protein: 0,
     carbs: 0,
     fat: 0,
     fiber: 0,
     estimated: true,
-    source: "text"
+    source: "text",
+    calculationMethod: "manual",
+    createdAt: new Date().toISOString()
   };
 }
 
@@ -95,15 +112,22 @@ export function drinkToMl(amount: number, unit: "ml" | "cc" | "l") {
 }
 
 function toFoodEntry(food: FoodPreset, source: FoodEntry["source"], label?: string): FoodEntry {
+  const parsed = parseFoodQuery(label ?? food.name);
   return {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     name: label ?? food.name,
+    inputText: label ?? food.name,
+    amount: parsed.amount,
+    unit: parsed.unit,
+    amountLabel: parsed.amountLabel,
     calories: food.calories,
     protein: food.protein,
     carbs: food.carbs,
     fat: food.fat,
     fiber: food.fiber,
     estimated: source === "photo" || source === "text",
-    source
+    source,
+    calculationMethod: source === "photo" ? "photo" : "database",
+    createdAt: new Date().toISOString()
   };
 }

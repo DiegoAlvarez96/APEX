@@ -41,7 +41,9 @@ function parseFoods(text: string | undefined): FoodEntry[] {
       fat: Number(item.fat ?? 0),
       fiber: Number(item.fiber ?? 0),
       estimated: true,
-      source: "photo"
+      source: "photo",
+      calculationMethod: "photo",
+      createdAt: new Date().toISOString()
     }));
   } catch {
     return estimatePhotoFoods();

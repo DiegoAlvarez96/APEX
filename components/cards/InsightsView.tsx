@@ -3,6 +3,7 @@
 import { BrainCircuit } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui/Card";
+import { InlineStatus } from "@/components/ui/Loading";
 import { createAiProvider, type ApexAiRecommendation } from "@/lib/ai/openai";
 import type { AppSettings, NutritionLog, ProductStockSummary, SleepLog, Workout } from "@/types/apex";
 
@@ -22,9 +23,11 @@ export function InsightsView({
   habitsCompleted: number;
 }) {
   const [items, setItems] = useState<ApexAiRecommendation[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
     void createAiProvider()
       .analyze({ settings, nutrition, stock, workouts, sleep, habitsCompleted })
       .then((next) => {
@@ -32,6 +35,9 @@ export function InsightsView({
       })
       .catch(() => {
         if (active) setItems([{ category: "habit", title: "IA no disponible", detail: "Configura una API key valida para usar OpenAI." }]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
     return () => {
       active = false;
@@ -46,6 +52,7 @@ export function InsightsView({
       </header>
       <Card>
         <SectionTitle eyebrow="OPENAI_API_KEY" title="Recomendaciones" />
+        <InlineStatus message={loading ? "Generando recomendaciones..." : undefined} tone="info" />
         <div className="space-y-3">
           {items.map((item) => (
             <div key={`${item.category}-${item.title}`} className="flex gap-3 rounded-2xl bg-white/[0.06] p-3 light:bg-black/[0.04]">

@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Dumbbell, HeartPulse, Home, Package, UserRound, Utensils } from "lucide-react";
+import { CalendarDays, Dumbbell, Home, Package, ShoppingCart, UserRound, Utensils } from "lucide-react";
 
 export type ViewKey = "home" | "dashboard" | "calendar" | "nutrition" | "training" | "physical" | "health" | "products" | "shopping" | "alerts" | "timeline" | "ai" | "chat" | "stats" | "settings" | "sleep";
 
@@ -10,7 +10,7 @@ const items = [
   { key: "nutrition", label: "Nutri", icon: Utensils },
   { key: "training", label: "Train", icon: Dumbbell },
   { key: "physical", label: "Fisico", icon: UserRound },
-  { key: "health", label: "Salud", icon: HeartPulse },
+  { key: "shopping", label: "Compras", icon: ShoppingCart },
   { key: "products", label: "Stock", icon: Package }
 ] satisfies { key: ViewKey; label: string; icon: typeof Home }[];
 

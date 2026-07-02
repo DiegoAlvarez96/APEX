@@ -1,7 +1,7 @@
 "use client";
 
 import Dexie, { type Table } from "dexie";
-import type { AgendaNote, ApexAlert, AppSettings, BodyMeasurement, ChatMessage, FoodCacheItem, NutritionLog, Product, ProductConsumption, ProgressPhoto, ShoppingItem, SleepLog, TaskCompletion, Workout } from "@/types/apex";
+import type { AgendaNote, ApexAlert, AppSettings, BodyMeasurement, ChatMessage, FoodCacheItem, NutritionLog, Product, ProductConsumption, ProgressPhoto, ShoppingItem, SleepLog, TaskCompletion, Workout, WorkoutTemplate } from "@/types/apex";
 
 class ApexDatabase extends Dexie {
   completions!: Table<TaskCompletion, number>;
@@ -11,6 +11,7 @@ class ApexDatabase extends Dexie {
   nutritionLogs!: Table<NutritionLog, number>;
   foodCache!: Table<FoodCacheItem, number>;
   workouts!: Table<Workout, number>;
+  workoutTemplates!: Table<WorkoutTemplate, number>;
   bodyMeasurements!: Table<BodyMeasurement, number>;
   shoppingItems!: Table<ShoppingItem, number>;
   chatMessages!: Table<ChatMessage, number>;
@@ -58,6 +59,23 @@ class ApexDatabase extends Dexie {
       nutritionLogs: "++id, &dateKey, createdAt",
       foodCache: "++id, &key, createdAt",
       workouts: "++id, dateKey, focus, createdAt",
+      bodyMeasurements: "++id, dateKey, createdAt",
+      shoppingItems: "++id, status, category, source, productId, createdAt",
+      chatMessages: "++id, role, createdAt",
+      agendaNotes: "++id, &dateKey, updatedAt",
+      sleepLogs: "++id, &dateKey, createdAt",
+      photos: "++id, zone, createdAt",
+      settings: "id"
+    });
+    this.version(5).stores({
+      completions: "++id, [dateKey+taskId], dateKey, taskId",
+      products: "++id, category, group, name, brand, purchaseDate",
+      productConsumptions: "++id, productId, dateKey, createdAt",
+      alerts: "++id, status, severity, source, productId, dueDateKey, createdAt",
+      nutritionLogs: "++id, &dateKey, createdAt",
+      foodCache: "++id, &key, createdAt",
+      workouts: "++id, dateKey, focus, createdAt",
+      workoutTemplates: "++id, group, source, createdAt, updatedAt",
       bodyMeasurements: "++id, dateKey, createdAt",
       shoppingItems: "++id, status, category, source, productId, createdAt",
       chatMessages: "++id, role, createdAt",

@@ -6,7 +6,6 @@ import { Dashboard } from "@/components/cards/Dashboard";
 import { AlertsView } from "@/components/cards/AlertsView";
 import { CalendarView } from "@/components/cards/CalendarView";
 import { ChatAiView } from "@/components/cards/ChatAiView";
-import { HealthAestheticView } from "@/components/cards/HealthAestheticView";
 import { HomeView } from "@/components/cards/HomeView";
 import { InsightsView } from "@/components/cards/InsightsView";
 import { NutritionSmartView } from "@/components/cards/NutritionSmartView";
@@ -66,25 +65,25 @@ export default function Home() {
       />
     ),
     calendar: <CalendarView selectedDate={selectedDate} onSelectDate={setSelectedDate} mode={calendarMode} onModeChange={setCalendarMode} workouts={store.workouts} stockSummaries={store.stockSummaries} nutrition={store.selectedNutrition} previousSleep={previousSleep} note={store.selectedAgendaNote?.note} onSaveNote={(note) => void store.saveAgendaNote(note)} isDone={store.isDone} onToggle={(id) => void store.toggleTask(id)} />,
-    nutrition: <NutritionSmartView nutrition={store.selectedNutrition} selectedDateKey={selectedDateKey} onSave={(values) => void store.upsertNutritionLog(values)} onDelete={(id) => void store.deleteNutritionLog(id)} onEstimateFood={store.estimateFood} />,
-    training: <TrainingSmartView workouts={store.workouts} onAddWorkout={(workout) => void store.addWorkout(workout)} onUpdateWorkout={(id, workout) => void store.updateWorkout(id, workout)} onDeleteWorkout={(id) => void store.deleteWorkout(id)} onDuplicateWorkout={(workout) => void store.duplicateWorkout(workout)} />,
-    physical: <PhysicalView latest={store.latestBody} measurements={store.bodyMeasurements} onSave={(value) => void store.addBodyMeasurement(value)} />,
-    health: <HealthAestheticView />,
+    nutrition: <NutritionSmartView nutrition={store.selectedNutrition} selectedDateKey={selectedDateKey} onSave={store.upsertNutritionLog} onDelete={store.deleteNutritionLog} onEstimateFood={store.estimateFood} />,
+    training: <TrainingSmartView workouts={store.workouts} templates={store.workoutTemplates} onAddWorkout={store.addWorkout} onUpdateWorkout={store.updateWorkout} onDeleteWorkout={store.deleteWorkout} onDuplicateWorkout={store.duplicateWorkout} onAddTemplate={store.addWorkoutTemplate} onDeleteTemplate={store.deleteWorkoutTemplate} />,
+    physical: <PhysicalView latest={store.latestBody} measurements={store.bodyMeasurements} onSave={store.addBodyMeasurement} onUpdate={store.updateBodyMeasurement} onDelete={store.deleteBodyMeasurement} />,
     products: (
       <ProductsSmartView
         summaries={store.stockSummaries}
-        onAddProduct={(product) => void store.addProduct(product)}
+        onAddProduct={store.addProduct}
         onAddConsumption={(id, amount, note) => void store.addProductConsumption(id, amount, note)}
       />
     ),
-    shopping: <ShoppingView items={store.shoppingItems} onSync={() => void store.syncShoppingList()} onUpdate={(id, status) => void store.updateShoppingStatus(id, status)} />,
+    shopping: <ShoppingView items={store.shoppingItems} onSync={store.syncShoppingList} onUpdate={store.updateShoppingStatus} />,
+    health: <ShoppingView items={store.shoppingItems} onSync={store.syncShoppingList} onUpdate={store.updateShoppingStatus} />,
     alerts: <AlertsView alerts={store.alerts} onSyncStockAlerts={() => void store.syncStockAlerts()} onUpdateStatus={(id, status) => void store.updateAlertStatus(id, status)} />,
     timeline: <TimelineView events={timeline} />,
     ai: <InsightsView settings={store.settings} nutrition={store.selectedNutrition} stock={store.stockSummaries} workouts={store.workouts} sleep={store.selectedSleep} habitsCompleted={habitsCompleted} />,
-    chat: <ChatAiView messages={store.chatMessages} onSend={(content) => void store.sendChatMessage(content)} onNewChat={() => void store.clearChat()} />,
+    chat: <ChatAiView messages={store.chatMessages} onSend={store.sendChatMessage} onNewChat={store.clearChat} />,
     stats: <StatsView completions={store.allCompletions} />,
     settings: <SettingsView settings={store.settings} onUpdateSettings={(settings) => void store.updateSettings(settings)} onExport={store.exportData} />,
-    sleep: <SleepView sleep={store.selectedSleep} onSave={(sleepTime, wakeTime) => void store.saveSleepLog(sleepTime, wakeTime)} />
+    sleep: <SleepView sleep={store.selectedSleep} onSave={store.saveSleepLog} />
   }[view];
 
   return (

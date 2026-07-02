@@ -106,6 +106,9 @@ export type FoodEntry = {
   id: string;
   name: string;
   amountLabel?: string;
+  inputText?: string;
+  amount?: number;
+  unit?: string;
   calories: number;
   protein: number;
   carbs: number;
@@ -113,6 +116,8 @@ export type FoodEntry = {
   fiber: number;
   estimated: boolean;
   source: "text" | "autocomplete" | "photo";
+  calculationMethod?: "openai" | "database" | "manual" | "fallback" | "photo";
+  createdAt?: string;
 };
 
 export type NutritionPlanItem = {
@@ -164,6 +169,19 @@ export type Workout = {
   createdAt: string;
 };
 
+export type WorkoutTemplate = {
+  id?: number;
+  name: string;
+  group: string;
+  focus: string;
+  intensity: 1 | 2 | 3 | 4 | 5;
+  exercises: WorkoutExercise[];
+  notes?: string;
+  source: "default" | "user" | "ai";
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type BodyMeasurement = {
   id?: number;
   dateKey: string;
@@ -178,6 +196,7 @@ export type BodyMeasurement = {
   legsCm?: number;
   neckCm?: number;
   photo?: string;
+  notes?: string;
   createdAt: string;
 };
 

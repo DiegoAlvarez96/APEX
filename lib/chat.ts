@@ -1,11 +1,14 @@
 import { formatSleepDuration } from "@/lib/sleep";
 import type { BodyMeasurement, NutritionLog, ProductStockSummary, SleepLog, Workout } from "@/types/apex";
 
-export function answerLocalChat(question: string, context: { nutrition?: NutritionLog; stock: ProductStockSummary[]; workouts: Workout[]; body?: BodyMeasurement; sleep?: SleepLog }) {
+export function answerLocalChat(question: string, context: { nutrition?: NutritionLog; nutritionToday?: NutritionLog; stock?: ProductStockSummary[]; workouts?: Workout[]; body?: BodyMeasurement; sleep?: SleepLog }) {
   const q = normalize(question);
-  const critical = context.stock.find((item) => item.status !== "ok");
+  const stock = context.stock ?? [];
+  const workouts = context.workouts ?? [];
+  const nutrition = context.nutrition ?? context.nutritionToday;
+  const critical = stock.find((item) => item.status !== "ok");
   if (q.includes("prote") || q.includes("macro") || q.includes("comida") || q.includes("nutri")) {
-    const protein = context.nutrition?.protein ?? 0;
+    const protein = nutrition?.protein ?? 0;
     return protein ? `Hoy llevas ${Math.round(protein)} g de proteina. Si tu objetivo es ganar masa muscular, revisaria que estes cerca de 1.6-2.2 g/kg.` : "Todavia no hay comidas cargadas hoy. Podes escribir alimentos o usar foto estimada.";
   }
   const asksStock =
@@ -22,7 +25,7 @@ export function answerLocalChat(question: string, context: { nutrition?: Nutriti
     q.includes("omega") ||
     q.includes("shampoo");
   if (asksStock) {
-    const requested = context.stock.find((item) => {
+    const requested = stock.find((item) => {
       const productText = normalize(`${item.product.name} ${item.product.commercialName ?? ""} ${item.product.brand ?? ""} ${item.product.category}`);
       return q.split(/\s+/).some((token) => token.length > 3 && productText.includes(token));
     });
@@ -31,7 +34,7 @@ export function answerLocalChat(question: string, context: { nutrition?: Nutriti
     return "Todavia no hay stock cargado para ese producto. Si lo agregas con cantidad inicial y consumo diario, APEX calcula dias restantes y fecha aproximada de compra.";
   }
   if (q.includes("entren") || q.includes("rutina") || q.includes("gimnasio") || q.includes("volumen")) {
-    return context.workouts[0] ? `El ultimo entrenamiento registrado es ${context.workouts[0].title}.` : "No hay entrenamientos registrados. Carga una sesion para analizar frecuencia y volumen.";
+    return workouts[0] ? `El ultimo entrenamiento registrado es ${workouts[0].title}.` : "No hay entrenamientos registrados. Carga una sesion para analizar frecuencia y volumen.";
   }
   if (q.includes("fisico") || q.includes("peso") || q.includes("medida") || q.includes("progreso")) {
     return context.body ? `Ultimo peso: ${context.body.weightKg} kg. Objetivo: ${context.body.goal}.` : "Todavia no cargaste mediciones en Mi fisico.";
@@ -42,13 +45,22 @@ export function answerLocalChat(question: string, context: { nutrition?: Nutriti
   if (q.includes("skincare") || q.includes("piel") || q.includes("barba") || q.includes("cabello")) {
     return "Para skincare puedo cruzar tu rutina del dia, fotos y productos cargados. Hoy revisaria cumplir limpieza, hidratacion y protector solar si corresponde.";
   }
+  if (q.includes("typescript") || q.includes("javascript") || q.includes("programacion") || q.includes("codigo")) {
+    return "TypeScript es JavaScript con tipos estaticos: te ayuda a detectar errores antes de ejecutar el codigo. En proyectos grandes mejora autocompletado, refactors y contratos entre componentes.";
+  }
+  if (q.includes("viaje") || q.includes("hotel") || q.includes("vuelo")) {
+    return "Puedo ayudarte a planificar viajes, armar itinerarios y comparar opciones. Con OPENAI_API_KEY activa puedo darte una respuesta mas completa y conversacional.";
+  }
+  if (q.includes("trabajo") || q.includes("idea") || q.includes("negocio")) {
+    return "Puedo ayudarte a ordenar ideas, escribir propuestas, preparar tareas de trabajo o pensar alternativas. Con OPENAI_API_KEY activa el chat responde como ChatGPT completo.";
+  }
   if (q.includes("mejor") || q.includes("recom") || q.includes("objetivo")) {
-    const protein = context.nutrition?.protein ?? 0;
+    const protein = nutrition?.protein ?? 0;
     if (protein > 0 && protein < 120) return "La mejora mas clara hoy seria subir proteina y sostener agua. Tambien registra entrenamiento para poder analizar volumen.";
     if (critical) return `La prioridad seria reponer ${critical.product.name}, porque esta en ${critical.percent}% de stock.`;
     return "La mejora principal es cargar comidas, entrenamiento y una medicion fisica reciente para que APEX tenga contexto suficiente.";
   }
-  return "Puedo ayudarte con nutricion, stock, entrenamiento, skincare y progreso fisico usando los datos locales de APEX.";
+  return "Puedo responder consultas generales y tambien usar tu contexto de APEX. Para respuestas completas tipo ChatGPT, configura OPENAI_API_KEY en el entorno.";
 }
 
 function normalize(value: string) {
