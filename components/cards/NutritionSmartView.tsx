@@ -6,6 +6,7 @@ import { Card, SectionTitle } from "@/components/ui/Card";
 import { DateNavigator } from "@/components/ui/DateNavigator";
 import { InlineStatus, LoadingButton } from "@/components/ui/Loading";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { FoodEstimateError } from "@/hooks/useApexStore";
 import { DateTimeService } from "@/lib/date";
 import { calculateNutritionTotals, createDrinkEntry, defaultNutritionPlan, parseFoodText, suggestFoods } from "@/lib/nutrition";
 import type { DrinkEntry, DrinkType, FoodEntry, FoodVisionResult, FoodVisionOption, NutritionLog, NutritionPlanItem } from "@/types/apex";
@@ -45,6 +46,7 @@ export function NutritionSmartView({
   const [selectedFood, setSelectedFood] = useState<FoodEntry>();
   const [editingFood, setEditingFood] = useState<FoodEntry>();
   const [visionConfirm, setVisionConfirm] = useState<{ options: FoodVisionOption[]; foods?: FoodEntry[]; other: string }>();
+  const [defaultConfirm, setDefaultConfirm] = useState<{ entry: FoodEntry; original: string }>();
   const totals = useMemo(() => calculateNutritionTotals(meals, planItems, drinks), [drinks, meals, planItems]);
   const waterMl = drinks.filter((drink) => drink.type === "water").reduce((sum, drink) => sum + drink.amountMl, 0);
   const suggestions = suggestFoods(query);
@@ -90,8 +92,8 @@ export function NutritionSmartView({
       setMeals(nextMeals);
       setText("");
       await autosave(nextMeals);
-    } catch {
-      setStatus({ message: "No se pudieron calcular los alimentos.", tone: "error" });
+    } catch (error) {
+      handleFoodEstimateError(error, text);
     } finally {
       setLoading(undefined);
     }
@@ -106,8 +108,8 @@ export function NutritionSmartView({
       setMeals(nextMeals);
       setQuery("");
       await autosave(nextMeals);
-    } catch {
-      setStatus({ message: "No se pudo agregar el alimento.", tone: "error" });
+    } catch (error) {
+      handleFoodEstimateError(error, foodName);
     } finally {
       setLoading(undefined);
     }
@@ -155,8 +157,8 @@ export function NutritionSmartView({
       setMeals(nextMeals);
       setVisionConfirm(undefined);
       await autosave(nextMeals);
-    } catch {
-      setStatus({ message: "No se pudo calcular el alimento confirmado.", tone: "error" });
+    } catch (error) {
+      handleFoodEstimateError(error, value);
     } finally {
       setLoading(undefined);
     }
@@ -167,6 +169,40 @@ export function NutritionSmartView({
     const nextDrinks = [...drinks, entry];
     setDrinks(nextDrinks);
     await autosave(meals, planItems, nextDrinks);
+  }
+
+  function handleFoodEstimateError(error: unknown, original: string) {
+    if (error instanceof FoodEstimateError) {
+      if (error.code === "quota") {
+        setStatus({ message: "Sin créditos en OpenAI. Revisá el saldo de la API.", tone: "error" });
+        return;
+      }
+      if (error.code === "parse_error" && error.defaultEntry) {
+        setDefaultConfirm({ entry: error.defaultEntry, original });
+        setStatus({ message: "Error al parsear la respuesta de OpenAI.", tone: "error" });
+        return;
+      }
+      setStatus({ message: "No se pudo obtener respuesta de OpenAI. Reintentá.", tone: "error" });
+      return;
+    }
+    setStatus({ message: "No se pudo obtener respuesta de OpenAI. Reintentá.", tone: "error" });
+  }
+
+  async function acceptDefaultFood() {
+    if (!defaultConfirm) return;
+    const entry: FoodEntry = { ...defaultConfirm.entry, source: "default_manual_confirmed", calculationMethod: "fallback", createdAt: DateTimeService.nowIso() };
+    const nextMeals = [...meals, entry];
+    console.info("[nutrition-openai:source_final]", JSON.stringify({ source: entry.source, calculationMethod: entry.calculationMethod, original: defaultConfirm.original }));
+    setMeals(nextMeals);
+    setDefaultConfirm(undefined);
+    setText("");
+    await autosave(nextMeals);
+  }
+
+  function rejectDefaultFood() {
+    console.info("[nutrition-openai:default_rejected]", JSON.stringify({ original: defaultConfirm?.original }));
+    setDefaultConfirm(undefined);
+    setStatus({ message: "Carga cancelada. No se guardó el alimento.", tone: "info" });
   }
 
   async function togglePlan(itemId: string) {
@@ -359,6 +395,31 @@ export function NutritionSmartView({
               ))}
               <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" placeholder="Otro..." value={visionConfirm.other} onChange={(event) => setVisionConfirm((current) => current ? { ...current, other: event.target.value } : current)} />
               <LoadingButton loading={loading === "food"} loadingLabel="Calculando..." className="h-11 rounded-2xl bg-limeglass font-semibold text-black" onClick={() => void confirmPhotoFood("Otro")}>Usar otro</LoadingButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {defaultConfirm ? (
+        <div className="fixed inset-0 z-[75] grid place-items-end bg-black/60 p-4 sm:place-items-center">
+          <div className="w-full max-w-md rounded-[28px] bg-[#101114] p-5 shadow-2xl light:bg-white">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-white/45 light:text-black/45">OpenAI</p>
+                <h2 className="text-xl font-semibold">Error al parsear la respuesta</h2>
+              </div>
+              <button className="grid size-9 place-items-center rounded-full bg-white/[0.08] light:bg-black/[0.05]" type="button" onClick={rejectDefaultFood}><X size={16} /></button>
+            </div>
+            <p className="text-sm leading-6 text-white/60 light:text-black/60">¿Querés cargar valores por defecto?</p>
+            <div className="mt-4 rounded-2xl bg-white/[0.06] p-3 text-sm light:bg-black/[0.04]">
+              <p className="font-semibold">{defaultConfirm.entry.name}</p>
+              <p className="mt-1 text-white/50 light:text-black/50">
+                {Math.round(defaultConfirm.entry.calories)} kcal - P {defaultConfirm.entry.protein} g - C {defaultConfirm.entry.carbs} g - G {defaultConfirm.entry.fat} g - Fibra {defaultConfirm.entry.fiber} g
+              </p>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button className="h-11 rounded-2xl bg-white/[0.08] text-sm light:bg-black/[0.05]" type="button" onClick={rejectDefaultFood}>Cancelar</button>
+              <LoadingButton loading={loading === "autosave"} loadingLabel="Guardando..." className="h-11 rounded-2xl bg-limeglass text-sm font-semibold text-black" onClick={() => void acceptDefaultFood()}>Cargar defaults</LoadingButton>
             </div>
           </div>
         </div>

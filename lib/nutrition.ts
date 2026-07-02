@@ -43,10 +43,11 @@ export function parseFoodText(value: string): FoodEntry[] {
 export function parseFoodQuery(value: string) {
   const normalized = value.trim();
   const match = normalized.match(/(\d+(?:[.,]\d+)?)\s*(gramos|gramo|gr|g|ml|cc|l|unidad|unidades|u)\b/i);
-  const amount = match ? Number(match[1].replace(",", ".")) : undefined;
+  const unitlessMatch = match ? undefined : normalized.match(/^(\d+(?:[.,]\d+)?)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ][\wáéíóúÁÉÍÓÚñÑ-]*)/);
+  const amount = match ? Number(match[1].replace(",", ".")) : unitlessMatch ? Number(unitlessMatch[1].replace(",", ".")) : undefined;
   const rawUnit = match?.[2]?.toLowerCase();
-  const unit = rawUnit ? ({ gramos: "g", gramo: "g", gr: "g", g: "g", ml: "ml", cc: "ml", l: "l", unidad: "un", unidades: "un", u: "un" }[rawUnit] ?? rawUnit) : undefined;
-  const name = normalized.replace(match?.[0] ?? "", "").replace(/\bde\b/gi, "").replace(/\s+/g, " ").trim() || normalized;
+  const unit = rawUnit ? ({ gramos: "g", gramo: "g", gr: "g", g: "g", ml: "ml", cc: "ml", l: "l", unidad: "un", unidades: "un", u: "un" }[rawUnit] ?? rawUnit) : unitlessMatch ? "un" : undefined;
+  const name = normalized.replace(match?.[0] ?? unitlessMatch?.[1] ?? "", "").replace(/\bde\b/gi, "").replace(/\s+/g, " ").trim() || normalized;
   return { name, amount, unit, amountLabel: amount && unit ? `${amount} ${unit}` : undefined };
 }
 

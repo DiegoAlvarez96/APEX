@@ -115,7 +115,7 @@ export type FoodEntry = {
   fat: number;
   fiber: number;
   estimated: boolean;
-  source: "text" | "autocomplete" | "photo";
+  source: "text" | "autocomplete" | "photo" | "default_manual_confirmed";
   calculationMethod?: "openai" | "database" | "manual" | "fallback" | "photo";
   createdAt?: string;
 };

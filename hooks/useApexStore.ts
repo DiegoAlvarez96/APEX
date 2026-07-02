@@ -337,13 +337,20 @@ export function useApexStore(selectedDate: Date) {
   const estimateFood = useCallback(async (text: string): Promise<FoodEntry> => {
     const key = text.trim().toLowerCase();
     const cached = await db.foodCache.where("key").equals(key).first();
-    if (cached) return cached.entry;
+    if (cached && hasValidFoodMacros(cached.entry)) return cached.entry;
+    if (cached?.id) await db.foodCache.delete(cached.id);
     const response = await fetch("/api/ai/food", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text })
     });
-    const entry = (await response.json()) as FoodEntry;
+    const payload = (await response.json()) as FoodEntry | FoodEstimateErrorPayload;
+    if (!response.ok) {
+      const errorPayload = payload as FoodEstimateErrorPayload;
+      throw new FoodEstimateError(errorPayload.error ?? "No se pudo calcular el alimento.", errorPayload.code ?? "api_error", errorPayload.defaultEntry);
+    }
+    const entry = payload as FoodEntry;
+    if (!hasValidFoodMacros(entry)) throw new FoodEstimateError("Error al parsear la respuesta de OpenAI.", "parse_error");
     await db.foodCache.put({ key, entry, createdAt: DateTimeService.nowIso() });
     return entry;
   }, []);
@@ -440,6 +447,31 @@ export function useApexStore(selectedDate: Date) {
     exportData,
     refresh
   };
+}
+
+type FoodEstimateErrorCode = "api_error" | "quota" | "parse_error";
+
+type FoodEstimateErrorPayload = {
+  code?: FoodEstimateErrorCode;
+  error?: string;
+  question?: string;
+  defaultEntry?: FoodEntry;
+};
+
+export class FoodEstimateError extends Error {
+  code: FoodEstimateErrorCode;
+  defaultEntry?: FoodEntry;
+
+  constructor(message: string, code: FoodEstimateErrorCode, defaultEntry?: FoodEntry) {
+    super(message);
+    this.name = "FoodEstimateError";
+    this.code = code;
+    this.defaultEntry = defaultEntry;
+  }
+}
+
+function hasValidFoodMacros(entry: FoodEntry) {
+  return entry.calories > 0 && entry.protein >= 0 && entry.carbs >= 0 && entry.fat >= 0 && entry.fiber >= 0 && entry.protein + entry.carbs + entry.fat + entry.fiber > 0;
 }
 
 type ApexProcessContextInput = {
