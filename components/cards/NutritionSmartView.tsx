@@ -1,25 +1,31 @@
 "use client";
 
-import { Camera, Check, Copy, Eye, Plus, Save, Search, Trash2 } from "lucide-react";
+import { Camera, Check, Copy, Eye, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui/Card";
+import { DateNavigator } from "@/components/ui/DateNavigator";
 import { InlineStatus, LoadingButton } from "@/components/ui/Loading";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { defaultNutritionPlan, drinkToMl, parseFoodText, suggestFoods, sumMeals } from "@/lib/nutrition";
-import type { DrinkEntry, DrinkType, FoodEntry, NutritionLog, NutritionPlanItem } from "@/types/apex";
+import { DateTimeService } from "@/lib/date";
+import { calculateNutritionTotals, createDrinkEntry, defaultNutritionPlan, parseFoodText, suggestFoods } from "@/lib/nutrition";
+import type { DrinkEntry, DrinkType, FoodEntry, FoodVisionResult, FoodVisionOption, NutritionLog, NutritionPlanItem } from "@/types/apex";
 
 type Mode = "text" | "search" | "photo";
 type DrinkUnit = "ml" | "cc" | "l";
 
 export function NutritionSmartView({
   nutrition,
+  selectedDate,
   selectedDateKey,
+  onSelectDate,
   onSave,
   onDelete,
   onEstimateFood
 }: {
   nutrition?: NutritionLog;
+  selectedDate: Date;
   selectedDateKey: string;
+  onSelectDate: (date: Date) => void;
   onSave: (values: Omit<NutritionLog, "id" | "createdAt" | "updatedAt">) => Promise<void> | void;
   onDelete: (id: number) => void;
   onEstimateFood: (text: string) => Promise<FoodEntry>;
@@ -27,7 +33,6 @@ export function NutritionSmartView({
   const [mode, setMode] = useState<Mode>("text");
   const [text, setText] = useState("");
   const [query, setQuery] = useState("");
-  const [date, setDate] = useState(nutrition?.dateKey ?? selectedDateKey);
   const [weightKg, setWeightKg] = useState(nutrition?.weightKg ?? 0);
   const [meals, setMeals] = useState<FoodEntry[]>(nutrition?.meals ?? []);
   const [planItems, setPlanItems] = useState<NutritionPlanItem[]>(nutrition?.planItems ?? defaultNutritionPlan);
@@ -35,22 +40,44 @@ export function NutritionSmartView({
   const [drinkType, setDrinkType] = useState<DrinkType>("water");
   const [drinkAmount, setDrinkAmount] = useState(500);
   const [drinkUnit, setDrinkUnit] = useState<DrinkUnit>("ml");
-  const [saved, setSaved] = useState(false);
-  const [loading, setLoading] = useState<"food" | "photo" | "save" | "autosave" | undefined>();
+  const [loading, setLoading] = useState<"food" | "photo" | "autosave" | "delete" | undefined>();
   const [status, setStatus] = useState<{ message?: string; tone?: "info" | "success" | "error" }>({});
   const [selectedFood, setSelectedFood] = useState<FoodEntry>();
   const [editingFood, setEditingFood] = useState<FoodEntry>();
-  const totals = useMemo(() => sumMeals(meals), [meals]);
+  const [visionConfirm, setVisionConfirm] = useState<{ options: FoodVisionOption[]; foods?: FoodEntry[]; other: string }>();
+  const totals = useMemo(() => calculateNutritionTotals(meals, planItems, drinks), [drinks, meals, planItems]);
   const waterMl = drinks.filter((drink) => drink.type === "water").reduce((sum, drink) => sum + drink.amountMl, 0);
   const suggestions = suggestFoods(query);
 
   useEffect(() => {
-    setDate(nutrition?.dateKey ?? selectedDateKey);
     setWeightKg(nutrition?.weightKg ?? 0);
     setMeals(nutrition?.meals ?? []);
     setPlanItems(nutrition?.planItems ?? defaultNutritionPlan);
     setDrinks(nutrition?.drinks ?? []);
+    setSelectedFood(undefined);
+    setEditingFood(undefined);
   }, [nutrition, selectedDateKey]);
+
+  async function autosave(nextMeals = meals, nextPlan = planItems, nextDrinks = drinks, nextWeight = weightKg) {
+    const nextTotals = calculateNutritionTotals(nextMeals, nextPlan, nextDrinks);
+    setLoading("autosave");
+    try {
+      await onSave({
+        ...nextTotals,
+        meals: nextMeals,
+        planItems: nextPlan,
+        drinks: nextDrinks,
+        waterMl: nextDrinks.filter((drink) => drink.type === "water").reduce((sum, drink) => sum + drink.amountMl, 0),
+        weightKg: nextWeight || undefined,
+        dateKey: selectedDateKey
+      });
+      setStatus({ message: "Guardado automatico.", tone: "success" });
+    } catch {
+      setStatus({ message: "No se pudo guardar nutricion.", tone: "error" });
+    } finally {
+      setLoading(undefined);
+    }
+  }
 
   async function addTextFoods() {
     if (!text.trim()) return;
@@ -59,9 +86,10 @@ export function NutritionSmartView({
     const parsed = parseFoodText(text);
     try {
       const enriched = await Promise.all(parsed.map((food) => (food.calories > 0 ? food : onEstimateFood(food.inputText ?? food.name))));
-      setMeals((current) => [...current, ...enriched]);
+      const nextMeals = [...meals, ...enriched];
+      setMeals(nextMeals);
       setText("");
-      setStatus({ message: "Alimentos agregados. Revisa y guarda el dia.", tone: "success" });
+      await autosave(nextMeals);
     } catch {
       setStatus({ message: "No se pudieron calcular los alimentos.", tone: "error" });
     } finally {
@@ -74,9 +102,10 @@ export function NutritionSmartView({
     setStatus({ message: "Consultando alimento...", tone: "info" });
     try {
       const food = await onEstimateFood(foodName);
-      setMeals((current) => [...current, { ...food, source: "autocomplete", estimated: false }]);
+      const nextMeals = [...meals, { ...food, source: "autocomplete" as const, estimated: false }];
+      setMeals(nextMeals);
       setQuery("");
-      setStatus({ message: "Alimento agregado.", tone: "success" });
+      await autosave(nextMeals);
     } catch {
       setStatus({ message: "No se pudo agregar el alimento.", tone: "error" });
     } finally {
@@ -97,9 +126,16 @@ export function NutritionSmartView({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ image: reader.result })
         });
-        const foods = (await response.json()) as FoodEntry[];
-        setMeals((current) => [...current, ...foods.map((food) => ({ ...food, calculationMethod: food.calculationMethod ?? "photo", createdAt: food.createdAt ?? new Date().toISOString() }))]);
-        setStatus({ message: "Imagen analizada.", tone: "success" });
+        const result = (await response.json()) as FoodVisionResult;
+        if (Array.isArray(result)) {
+          const nextMeals = [...meals, ...result.map((food) => ({ ...food, calculationMethod: food.calculationMethod ?? "photo", createdAt: food.createdAt ?? DateTimeService.nowIso() }))];
+          setMeals(nextMeals);
+          await autosave(nextMeals);
+          setStatus({ message: "Imagen analizada y guardada.", tone: "success" });
+        } else {
+          setVisionConfirm({ options: result.options, foods: result.foods, other: "" });
+          setStatus({ message: result.message ?? "Confirmá el alimento detectado.", tone: "info" });
+        }
       } catch {
         setStatus({ message: "No se pudo analizar la imagen.", tone: "error" });
       } finally {
@@ -109,64 +145,79 @@ export function NutritionSmartView({
     reader.readAsDataURL(file);
   }
 
-  function addDrink() {
-    const amountMl = drinkToMl(drinkAmount, drinkUnit);
-    setDrinks((current) => [
-      ...current,
-      { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, type: drinkType, amountMl, label: `${drinkAmount} ${drinkUnit}` }
-    ]);
-  }
-
-  async function save(nextMeals = meals, nextPlan = planItems, nextDrinks = drinks, silent = false) {
-    const nextTotals = sumMeals(nextMeals);
-    let success = false;
-    if (!silent) {
-      setLoading("save");
-      setStatus({ message: "Guardando comida...", tone: "info" });
-    }
+  async function confirmPhotoFood(label: string) {
+    const value = label === "Otro" ? visionConfirm?.other.trim() : label;
+    if (!value) return;
+    setLoading("food");
     try {
-      await onSave({ ...nextTotals, waterMl: nextDrinks.filter((drink) => drink.type === "water").reduce((sum, drink) => sum + drink.amountMl, 0), weightKg: weightKg || undefined, dateKey: date, meals: nextMeals, planItems: nextPlan, drinks: nextDrinks });
-      success = true;
-      if (!silent) setStatus({ message: "Guardado. Dashboard e historial actualizados.", tone: "success" });
+      const food = await onEstimateFood(value);
+      const nextMeals: FoodEntry[] = [...meals, { ...food, source: "photo", calculationMethod: "photo", createdAt: DateTimeService.nowIso() }];
+      setMeals(nextMeals);
+      setVisionConfirm(undefined);
+      await autosave(nextMeals);
     } catch {
-      setStatus({ message: "No se pudo guardar nutricion.", tone: "error" });
+      setStatus({ message: "No se pudo calcular el alimento confirmado.", tone: "error" });
     } finally {
-      if (!silent) setLoading(undefined);
-    }
-    if (success) {
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 1800);
+      setLoading(undefined);
     }
   }
 
-  function togglePlan(itemId: string) {
+  async function addDrink() {
+    const entry = createDrinkEntry(drinkType, drinkAmount, drinkUnit);
+    const nextDrinks = [...drinks, entry];
+    setDrinks(nextDrinks);
+    await autosave(meals, planItems, nextDrinks);
+  }
+
+  async function togglePlan(itemId: string) {
     const nextPlan = planItems.map((currentItem) => currentItem.id === itemId ? { ...currentItem, done: !currentItem.done } : currentItem);
     setPlanItems(nextPlan);
-    setLoading("autosave");
-    setStatus({ message: "Guardando checklist...", tone: "info" });
-    void save(meals, nextPlan, drinks, true).then(() => {
-      setStatus({ message: "Checklist actualizado.", tone: "success" });
-      setLoading(undefined);
-    });
+    await autosave(meals, nextPlan, drinks);
   }
 
-  function updateFood(food: FoodEntry) {
+  async function updateFood(food: FoodEntry) {
     const nextMeals = meals.map((meal) => meal.id === food.id ? food : meal);
     setMeals(nextMeals);
     setSelectedFood(food);
     setEditingFood(undefined);
+    await autosave(nextMeals);
   }
 
-  function duplicateFood(food: FoodEntry) {
-    setMeals((current) => [...current, { ...food, id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, createdAt: new Date().toISOString() }]);
+  async function duplicateFood(food: FoodEntry) {
+    const nextMeals = [...meals, { ...food, id: DateTimeService.id("food-copy"), createdAt: DateTimeService.nowIso() }];
+    setMeals(nextMeals);
+    await autosave(nextMeals);
+  }
+
+  async function deleteFood(foodId: string) {
+    const nextMeals = meals.filter((item) => item.id !== foodId);
+    setMeals(nextMeals);
+    if (selectedFood?.id === foodId) setSelectedFood(undefined);
+    await autosave(nextMeals);
+  }
+
+  async function deleteDrink(drinkId: string) {
+    const nextDrinks = drinks.filter((drink) => drink.id !== drinkId);
+    setDrinks(nextDrinks);
+    await autosave(meals, planItems, nextDrinks);
+  }
+
+  async function deleteDay() {
+    if (!nutrition?.id) return;
+    setLoading("delete");
+    try {
+      await onDelete(nutrition.id);
+      setStatus({ message: "Dia eliminado.", tone: "success" });
+    } catch {
+      setStatus({ message: "No se pudo eliminar el dia.", tone: "error" });
+    } finally {
+      setLoading(undefined);
+    }
   }
 
   return (
     <div className="space-y-5">
-      <header className="px-1 pt-2">
-        <p className="text-sm text-white/45 light:text-black/45">Plan, comidas extra y bebidas</p>
-        <h1 className="text-3xl font-semibold">Nutricion</h1>
-      </header>
+      <DateNavigator title="Nutricion" eyebrow="Plan, comidas y bebidas" selectedDate={selectedDate} onSelectDate={onSelectDate} />
 
       <Card>
         <SectionTitle title="Plan del dia" eyebrow="IA-ready" />
@@ -178,7 +229,7 @@ export function NutritionSmartView({
                 <button
                   key={item.id}
                   className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-sm ${item.done ? "bg-limeglass text-black" : "bg-white/[0.06] light:bg-black/[0.04]"}`}
-                  onClick={() => togglePlan(item.id)}
+                  onClick={() => void togglePlan(item.id)}
                   disabled={loading === "autosave"}
                   type="button"
                 >
@@ -191,8 +242,9 @@ export function NutritionSmartView({
       </Card>
 
       <SegmentedControl value={mode} onChange={setMode} options={[{ value: "text", label: "Extra" }, { value: "search", label: "Buscar" }, { value: "photo", label: "Foto" }]} />
+
       <Card>
-        <SectionTitle title="Agregar comidas fuera del plan" eyebrow="IA si no existe" />
+        <SectionTitle title="Agregar comidas fuera del plan" eyebrow="Autoguardado" />
         {mode === "text" ? (
           <div className="grid gap-3">
             <textarea className="min-h-28 rounded-3xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" placeholder="150 gramos de milanesa de pollo&#10;Cafe&#10;Alfajor" value={text} onChange={(event) => setText(event.target.value)} />
@@ -208,13 +260,11 @@ export function NutritionSmartView({
         {mode === "photo" ? (
           <label className="flex min-h-28 w-full cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed border-white/20 bg-white/[0.04] light:border-black/15 light:bg-black/[0.03]">
             <Camera className="mb-2 text-limeglass" /> Tomar o seleccionar foto
-            <span className="mt-1 text-xs text-white/45 light:text-black/45">{loading === "photo" ? "Analizando imagen..." : "La IA estima alimentos, porciones y macros."}</span>
+            <span className="mt-1 text-xs text-white/45 light:text-black/45">{loading === "photo" ? "Analizando imagen..." : "Si hay duda, APEX pide confirmacion antes de guardar."}</span>
             <input className="hidden" type="file" accept="image/*" capture="environment" onChange={(event) => void handlePhoto(event.target.files?.[0] ?? null)} />
           </label>
         ) : null}
       </Card>
-
-      <InlineStatus message={status.message} tone={status.tone} />
 
       <Card>
         <SectionTitle title="Bebidas" />
@@ -233,30 +283,31 @@ export function NutritionSmartView({
             <option value="cc">cc</option>
             <option value="l">l</option>
           </select>
-          <button className="grid size-10 place-items-center rounded-2xl bg-white text-black" onClick={addDrink} type="button"><Plus size={16} /></button>
+          <button className="grid size-10 place-items-center rounded-2xl bg-white text-black" onClick={() => void addDrink()} type="button"><Plus size={16} /></button>
         </div>
         <div className="mt-3 space-y-2">
-          {drinks.map((drink) => <div key={drink.id} className="flex justify-between rounded-2xl bg-white/[0.06] px-3 py-2 text-sm light:bg-black/[0.04]"><span>{drink.type} - {drink.label}</span><span>{drink.amountMl} ml</span></div>)}
+          {drinks.map((drink) => (
+            <div key={drink.id} className="flex items-center justify-between rounded-2xl bg-white/[0.06] px-3 py-2 text-sm light:bg-black/[0.04]">
+              <span>{drink.type} - {drink.label}</span>
+              <div className="flex items-center gap-3">
+                <span>{drink.amountMl} ml</span>
+                <button onClick={() => void deleteDrink(drink.id)} type="button" aria-label="Eliminar bebida"><Trash2 size={15} /></button>
+              </div>
+            </div>
+          ))}
         </div>
       </Card>
 
-      <Card>
-        <SectionTitle title="Dashboard del dia" />
-        <div className="grid grid-cols-2 gap-3">
-          <Metric label="Calorias" detail="Energia total consumida durante el dia." value={`${Math.round(totals.calories)} kcal`} />
-          <Metric label="Proteinas" detail="Cantidad de proteinas consumidas durante el dia." value={`${Math.round(totals.protein)} g`} />
-          <Metric label="Carbohidratos" detail="Cantidad total ingerida." value={`${Math.round(totals.carbs)} g`} />
-          <Metric label="Grasas" detail="Grasas totales registradas." value={`${Math.round(totals.fat)} g`} />
-          <Metric label="Fibra" detail="Fibra estimada de los alimentos." value={`${Math.round(totals.fiber ?? 0)} g`} />
-          <Metric label="Agua" detail="Agua registrada y convertida a ml." value={`${(waterMl / 1000).toFixed(1)} L`} />
-        </div>
-      </Card>
+      <InlineStatus message={loading === "autosave" ? "Guardando..." : status.message} tone={loading === "autosave" ? "info" : status.tone} />
 
       <Card>
-        <SectionTitle title="Guardar" />
+        <SectionTitle title="Historial de comidas del dia" />
         <div className="mb-3 grid grid-cols-2 gap-2">
-          <input className="rounded-2xl bg-white/[0.08] px-3 py-2 outline-none light:bg-black/[0.05]" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-          <input className="rounded-2xl bg-white/[0.08] px-3 py-2 outline-none light:bg-black/[0.05]" type="number" placeholder="Peso" value={weightKg} onChange={(event) => setWeightKg(Number(event.target.value))} />
+          <label className="rounded-2xl bg-white/[0.08] px-3 py-2 text-sm light:bg-black/[0.05]">
+            <span className="text-xs text-white/45 light:text-black/45">Peso</span>
+            <input className="mt-1 w-full bg-transparent outline-none" type="number" placeholder="kg" value={weightKg} onBlur={() => void autosave(meals, planItems, drinks)} onChange={(event) => setWeightKg(Number(event.target.value))} />
+          </label>
+          <LoadingButton loading={loading === "delete"} loadingLabel="Borrando..." className="flex h-full items-center justify-center gap-1 rounded-2xl bg-red-500/20 text-sm text-red-200 light:text-red-700" onClick={() => void deleteDay()}><Trash2 size={16} /> Borrar dia</LoadingButton>
         </div>
         <div className="space-y-2">
           {meals.map((meal) => (
@@ -267,19 +318,51 @@ export function NutritionSmartView({
               </button>
               <div className="flex gap-2">
                 <button onClick={() => setSelectedFood(meal)} type="button" aria-label="Detalle"><Eye size={16} /></button>
-                <button onClick={() => duplicateFood(meal)} type="button" aria-label="Duplicar"><Copy size={16} /></button>
-                <button onClick={() => setMeals((current) => current.filter((item) => item.id !== meal.id))} type="button" aria-label="Eliminar"><Trash2 size={16} /></button>
+                <button onClick={() => void duplicateFood(meal)} type="button" aria-label="Duplicar"><Copy size={16} /></button>
+                <button onClick={() => void deleteFood(meal.id)} type="button" aria-label="Eliminar"><Trash2 size={16} /></button>
               </div>
             </div>
           ))}
+          {meals.length === 0 ? <p className="text-sm text-white/45 light:text-black/45">Sin comidas extra registradas para este dia.</p> : null}
         </div>
-        {selectedFood ? <FoodDetail food={selectedFood} editing={editingFood?.id === selectedFood.id} onEdit={() => setEditingFood(selectedFood)} onCancel={() => setEditingFood(undefined)} onChange={setEditingFood} draft={editingFood ?? selectedFood} onSave={(food) => updateFood(food)} /> : null}
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <LoadingButton loading={loading === "save"} loadingLabel="Guardando..." className="flex h-11 items-center justify-center gap-1 rounded-2xl bg-limeglass text-sm font-semibold text-black" onClick={() => void save()}><Save size={16} /> Guardar</LoadingButton>
-          <button className="flex h-11 items-center justify-center gap-1 rounded-2xl bg-red-500/20 text-sm text-red-200 light:text-red-700" onClick={() => nutrition?.id && onDelete(nutrition.id)} type="button"><Trash2 size={16} /> Borrar dia</button>
-        </div>
-        {saved ? <p className="mt-3 rounded-2xl bg-limeglass/15 p-3 text-center text-sm text-limeglass light:text-black">Guardado. Dashboard e historial actualizados.</p> : null}
+        {selectedFood ? <FoodDetail food={selectedFood} editing={editingFood?.id === selectedFood.id} onEdit={() => setEditingFood(selectedFood)} onCancel={() => setEditingFood(undefined)} onChange={setEditingFood} draft={editingFood ?? selectedFood} onSave={(food) => void updateFood(food)} /> : null}
       </Card>
+
+      <Card>
+        <SectionTitle title="Dashboard del dia" />
+        <div className="grid grid-cols-2 gap-3">
+          <Metric label="Calorias" detail="Plan completado, extras y bebidas." value={`${Math.round(totals.calories)} kcal`} />
+          <Metric label="Proteinas" detail="Proteina total del dia." value={`${Math.round(totals.protein)} g`} />
+          <Metric label="Carbohidratos" detail="Carbos de plan, extras y bebidas." value={`${Math.round(totals.carbs)} g`} />
+          <Metric label="Grasas" detail="Grasas totales registradas." value={`${Math.round(totals.fat)} g`} />
+          <Metric label="Fibra" detail="Fibra estimada total." value={`${Math.round(totals.fiber ?? 0)} g`} />
+          <Metric label="Agua" detail="Agua registrada y convertida a ml." value={`${(waterMl / 1000).toFixed(1)} L`} />
+        </div>
+      </Card>
+
+      {visionConfirm ? (
+        <div className="fixed inset-0 z-[70] grid place-items-end bg-black/60 p-4 sm:place-items-center">
+          <div className="w-full max-w-md rounded-[28px] bg-[#101114] p-5 shadow-2xl light:bg-white">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-white/45 light:text-black/45">Confirmacion IA</p>
+                <h2 className="text-xl font-semibold">A que corresponde esta imagen?</h2>
+              </div>
+              <button className="grid size-9 place-items-center rounded-full bg-white/[0.08] light:bg-black/[0.05]" type="button" onClick={() => setVisionConfirm(undefined)}><X size={16} /></button>
+            </div>
+            <div className="grid gap-2">
+              {visionConfirm.options.map((option) => (
+                <button key={option.label} className="rounded-2xl bg-white/[0.08] px-4 py-3 text-left text-sm light:bg-black/[0.05]" type="button" onClick={() => void confirmPhotoFood(option.label)}>
+                  {option.label}
+                  {option.confidence ? <span className="ml-2 text-xs text-white/40 light:text-black/40">{Math.round(option.confidence * 100)}%</span> : null}
+                </button>
+              ))}
+              <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" placeholder="Otro..." value={visionConfirm.other} onChange={(event) => setVisionConfirm((current) => current ? { ...current, other: event.target.value } : current)} />
+              <LoadingButton loading={loading === "food"} loadingLabel="Calculando..." className="h-11 rounded-2xl bg-limeglass font-semibold text-black" onClick={() => void confirmPhotoFood("Otro")}>Usar otro</LoadingButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -309,7 +392,7 @@ function FoodDetail({
     ["Fibra", `${food.fiber} g`],
     ["Cantidad", food.amountLabel ?? food.inputText ?? "-"],
     ["Metodo", food.calculationMethod ?? food.source],
-    ["Fecha", food.createdAt ? new Date(food.createdAt).toLocaleString("es-AR") : "-"]
+    ["Fecha", DateTimeService.displayDateTime(food.createdAt)]
   ];
   return (
     <div className="mt-4 rounded-3xl bg-white/[0.06] p-3 light:bg-black/[0.04]">

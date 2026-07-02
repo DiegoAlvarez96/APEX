@@ -1,4 +1,4 @@
-import { weekdayInAppTimeZone } from "@/lib/date";
+import { DateTimeService, weekdayInAppTimeZone } from "@/lib/date";
 import type { RoutineDay, RoutineTask } from "@/types/apex";
 
 const morningNormal: Omit<RoutineTask, "id">[] = [
@@ -55,7 +55,7 @@ export const routineDays: RoutineDay[] = [
   { weekday: 0, label: "Domingo", tasks: withIds(0, [...morningNormal, ...afternoon, ...sundayNight]) }
 ];
 
-export function getRoutineForDate(date = new Date()) {
+export function getRoutineForDate(date = DateTimeService.todayDate()) {
   return routineDays.find((day) => day.weekday === weekdayInAppTimeZone(date)) ?? routineDays[0];
 }
 

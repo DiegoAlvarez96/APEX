@@ -2,12 +2,12 @@
 
 import { Flame, LineChart, RollerCoaster, TrendingUp } from "lucide-react";
 import { Card, SectionTitle } from "@/components/ui/Card";
-import { addDays, dateKey, shortWeekday, weekdayInAppTimeZone } from "@/lib/date";
+import { DateTimeService, addDays, dateKey, shortWeekday, weekdayInAppTimeZone } from "@/lib/date";
 import { routineDays } from "@/lib/routines";
 import type { TaskCompletion } from "@/types/apex";
 
 export function StatsView({ completions }: { completions: TaskCompletion[] }) {
-  const today = new Date();
+  const today = DateTimeService.todayDate();
   const week = Array.from({ length: 7 }, (_, index) => addDays(today, index - 6));
   const weeklyDone = completions.filter((item) => week.some((day) => dateKey(day) === item.dateKey) && item.done).length;
   const weeklyTotal = routineDays.reduce((sum, day) => sum + day.tasks.length, 0);
@@ -64,7 +64,7 @@ function Metric({ icon: Icon, label, value }: { icon: typeof TrendingUp; label: 
 
 function calculateStreak(completions: TaskCompletion[]) {
   let streak = 0;
-  let cursor = new Date();
+  let cursor = DateTimeService.todayDate();
   while (streak < 365) {
     const key = dateKey(cursor);
     const hasDone = completions.some((item) => item.dateKey === key && item.done);

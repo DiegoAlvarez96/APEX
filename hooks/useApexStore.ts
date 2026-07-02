@@ -2,12 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { db, defaultSettings, ensureSettings } from "@/lib/db";
-import { dateKey } from "@/lib/date";
+import { DateTimeService, addDays, dateFromKey, dateKey, monthStart } from "@/lib/date";
 import { buildStockAlerts, summarizeProductStock } from "@/lib/stock";
 import { buildShoppingSuggestions } from "@/lib/shopping";
 import { answerLocalChat } from "@/lib/chat";
 import { calculateSleepDuration } from "@/lib/sleep";
+import { normalizeNutritionLog } from "@/lib/nutrition";
+import { getRoutineForDate } from "@/lib/routines";
+import { assignedWorkoutTemplateForDate } from "@/lib/trainingTemplates";
 import type { AgendaNote, ApexAlert, AppSettings, BodyMeasurement, ChatMessage, FoodEntry, NutritionLog, Product, ProductConsumption, ProgressPhoto, ShoppingItem, SleepLog, TaskCompletion, Workout, WorkoutTemplate } from "@/types/apex";
+
+const APEX_PROCESS_START_DATE_KEY = "2026-07-01";
 
 export function useApexStore(selectedDate: Date) {
   const selectedDateKey = useMemo(() => dateKey(selectedDate), [selectedDate]);
@@ -50,7 +55,7 @@ export function useApexStore(selectedDate: Date) {
     setProducts(nextProducts);
     setProductConsumptions(nextConsumptions);
     setAlerts(nextAlerts);
-    setNutritionLogs(nextNutritionLogs);
+    setNutritionLogs(nextNutritionLogs.map(normalizeNutritionLog));
     setWorkouts(nextWorkouts);
     setWorkoutTemplates(nextTemplates);
     setBodyMeasurements(nextBody);
@@ -102,13 +107,13 @@ export function useApexStore(selectedDate: Date) {
         .first();
       const nextDone = !existing?.done;
       if (existing?.id) {
-        await db.completions.update(existing.id, { done: nextDone, updatedAt: new Date().toISOString() });
+        await db.completions.update(existing.id, { done: nextDone, updatedAt: DateTimeService.nowIso() });
       } else {
         await db.completions.add({
           dateKey: selectedDateKey,
           taskId,
           done: true,
-          updatedAt: new Date().toISOString()
+          updatedAt: DateTimeService.nowIso()
         });
       }
       await refresh();
@@ -119,7 +124,7 @@ export function useApexStore(selectedDate: Date) {
   const addProduct = useCallback(
     async (product: Omit<Product, "id" | "createdAt">) => {
       const initialStock = product.initialStock ?? product.size ?? product.quantity;
-      await db.products.add({ ...product, group: product.group, initialStock, size: product.size ?? initialStock, quantity: initialStock, createdAt: new Date().toISOString() });
+      await db.products.add({ ...product, group: product.group, initialStock, size: product.size ?? initialStock, quantity: initialStock, createdAt: DateTimeService.nowIso() });
       await refresh();
     },
     [refresh]
@@ -140,7 +145,7 @@ export function useApexStore(selectedDate: Date) {
         amount,
         note,
         dateKey: selectedDateKey,
-        createdAt: new Date().toISOString()
+        createdAt: DateTimeService.nowIso()
       });
       await refresh();
     },
@@ -149,7 +154,7 @@ export function useApexStore(selectedDate: Date) {
 
   const updateAlertStatus = useCallback(
     async (id: number, status: ApexAlert["status"]) => {
-      await db.alerts.update(id, { status, updatedAt: new Date().toISOString() });
+      await db.alerts.update(id, { status, updatedAt: DateTimeService.nowIso() });
       await refresh();
     },
     [refresh]
@@ -166,7 +171,7 @@ export function useApexStore(selectedDate: Date) {
     async (values: Omit<NutritionLog, "id" | "createdAt" | "updatedAt">) => {
       const targetDateKey = values.dateKey ?? selectedDateKey;
       const existing = await db.nutritionLogs.where("dateKey").equals(targetDateKey).first();
-      const now = new Date().toISOString();
+      const now = DateTimeService.nowIso();
       if (existing?.id) {
         await db.nutritionLogs.update(existing.id, { ...values, updatedAt: now });
       } else {
@@ -178,15 +183,16 @@ export function useApexStore(selectedDate: Date) {
   );
 
   const addWorkout = useCallback(
-    async (workout: Omit<Workout, "id" | "dateKey" | "createdAt">) => {
-      await db.workouts.add({ ...workout, dateKey: selectedDateKey, createdAt: new Date().toISOString() });
+    async (workout: Omit<Workout, "id" | "dateKey" | "createdAt"> & { dateKey?: string }) => {
+      const now = DateTimeService.nowIso();
+      await db.workouts.add({ ...workout, dateKey: workout.dateKey ?? selectedDateKey, createdAt: now, updatedAt: now });
       await refresh();
     },
     [refresh, selectedDateKey]
   );
 
   const updateWorkout = useCallback(async (id: number, workout: Partial<Workout>) => {
-    await db.workouts.update(id, workout);
+    await db.workouts.update(id, { ...workout, updatedAt: DateTimeService.nowIso() });
     await refresh();
   }, [refresh]);
 
@@ -197,12 +203,13 @@ export function useApexStore(selectedDate: Date) {
 
   const duplicateWorkout = useCallback(async (workout: Workout) => {
     const { id: _id, createdAt: _createdAt, ...copy } = workout;
-    await db.workouts.add({ ...copy, dateKey: selectedDateKey, title: `${workout.title} copia`, createdAt: new Date().toISOString() });
+    const now = DateTimeService.nowIso();
+    await db.workouts.add({ ...copy, dateKey: selectedDateKey, title: `${workout.title} copia`, createdAt: now, updatedAt: now });
     await refresh();
   }, [refresh, selectedDateKey]);
 
   const addWorkoutTemplate = useCallback(async (template: Omit<WorkoutTemplate, "id" | "createdAt" | "updatedAt">) => {
-    const now = new Date().toISOString();
+    const now = DateTimeService.nowIso();
     await db.workoutTemplates.add({ ...template, createdAt: now, updatedAt: now });
     await refresh();
   }, [refresh]);
@@ -219,13 +226,13 @@ export function useApexStore(selectedDate: Date) {
 
   const duplicateNutritionLog = useCallback(async (log: NutritionLog) => {
     const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...copy } = log;
-    const now = new Date().toISOString();
+    const now = DateTimeService.nowIso();
     await db.nutritionLogs.add({ ...copy, dateKey: selectedDateKey, createdAt: now, updatedAt: now });
     await refresh();
   }, [refresh, selectedDateKey]);
 
   const addBodyMeasurement = useCallback(async (measurement: Omit<BodyMeasurement, "id" | "dateKey" | "createdAt">) => {
-    await db.bodyMeasurements.add({ ...measurement, dateKey: selectedDateKey, createdAt: new Date().toISOString() });
+    await db.bodyMeasurements.add({ ...measurement, dateKey: selectedDateKey, createdAt: DateTimeService.nowIso() });
     await refresh();
   }, [refresh, selectedDateKey]);
 
@@ -247,13 +254,28 @@ export function useApexStore(selectedDate: Date) {
   }, [refresh, stockSummaries]);
 
   const updateShoppingStatus = useCallback(async (id: number, status: ShoppingItem["status"]) => {
-    await db.shoppingItems.update(id, { status, updatedAt: new Date().toISOString() });
+    await db.shoppingItems.update(id, { status, updatedAt: DateTimeService.nowIso() });
     await refresh();
   }, [refresh]);
 
   const sendChatMessage = useCallback(async (content: string) => {
-    await db.chatMessages.add({ role: "user", content, createdAt: new Date().toISOString() });
+    await db.chatMessages.add({ role: "user", content, createdAt: DateTimeService.nowIso() });
     const context = {
+      process: buildApexProcessContext({
+        selectedDate,
+        selectedDateKey,
+        nutritionLogs,
+        productConsumptions,
+        workouts,
+        workoutTemplates,
+        bodyMeasurements,
+        sleepLogs,
+        shoppingItems,
+        alerts,
+        completions: allCompletions,
+        agendaNotes,
+        settings
+      }),
       selectedDateKey,
       nutritionToday: selectedNutrition,
       nutritionLogs,
@@ -286,9 +308,9 @@ export function useApexStore(selectedDate: Date) {
     } catch {
       answer = answerLocalChat(content, context);
     }
-    await db.chatMessages.add({ role: "assistant", content: answer, createdAt: new Date().toISOString() });
+    await db.chatMessages.add({ role: "assistant", content: answer, createdAt: DateTimeService.nowIso() });
     await refresh();
-  }, [agendaNotes, alerts, allCompletions, bodyMeasurements, chatMessages, latestBody, nutritionLogs, productConsumptions, products, refresh, selectedDateKey, selectedNutrition, selectedSleep, settings, shoppingItems, sleepLogs, stockSummaries, workoutTemplates, workouts]);
+  }, [agendaNotes, alerts, allCompletions, bodyMeasurements, chatMessages, latestBody, nutritionLogs, productConsumptions, products, refresh, selectedDate, selectedDateKey, selectedNutrition, selectedSleep, settings, shoppingItems, sleepLogs, stockSummaries, workoutTemplates, workouts]);
 
   const clearChat = useCallback(async () => {
     await db.chatMessages.clear();
@@ -297,7 +319,7 @@ export function useApexStore(selectedDate: Date) {
 
   const saveAgendaNote = useCallback(async (note: string) => {
     const existing = await db.agendaNotes.where("dateKey").equals(selectedDateKey).first();
-    const payload = { dateKey: selectedDateKey, note, updatedAt: new Date().toISOString() };
+    const payload = { dateKey: selectedDateKey, note, updatedAt: DateTimeService.nowIso() };
     if (existing?.id) await db.agendaNotes.update(existing.id, payload);
     else await db.agendaNotes.add(payload);
     await refresh();
@@ -306,9 +328,9 @@ export function useApexStore(selectedDate: Date) {
   const saveSleepLog = useCallback(async (sleepTime: string, wakeTime: string) => {
     const durationMinutes = calculateSleepDuration(sleepTime, wakeTime);
     const existing = await db.sleepLogs.where("dateKey").equals(selectedDateKey).first();
-    const payload = { dateKey: selectedDateKey, sleepTime, wakeTime, durationMinutes, updatedAt: new Date().toISOString() };
+    const payload = { dateKey: selectedDateKey, sleepTime, wakeTime, durationMinutes, updatedAt: DateTimeService.nowIso() };
     if (existing?.id) await db.sleepLogs.update(existing.id, payload);
-    else await db.sleepLogs.add({ ...payload, createdAt: new Date().toISOString() });
+    else await db.sleepLogs.add({ ...payload, createdAt: DateTimeService.nowIso() });
     await refresh();
   }, [refresh, selectedDateKey]);
 
@@ -322,13 +344,13 @@ export function useApexStore(selectedDate: Date) {
       body: JSON.stringify({ text })
     });
     const entry = (await response.json()) as FoodEntry;
-    await db.foodCache.put({ key, entry, createdAt: new Date().toISOString() });
+    await db.foodCache.put({ key, entry, createdAt: DateTimeService.nowIso() });
     return entry;
   }, []);
 
   const addPhoto = useCallback(
     async (photo: Omit<ProgressPhoto, "id" | "createdAt">) => {
-      await db.photos.add({ ...photo, createdAt: new Date().toISOString() });
+      await db.photos.add({ ...photo, createdAt: DateTimeService.nowIso() });
       await refresh();
     },
     [refresh]
@@ -345,7 +367,7 @@ export function useApexStore(selectedDate: Date) {
 
   const exportData = useCallback(async () => {
     const data = {
-      exportedAt: new Date().toISOString(),
+      exportedAt: DateTimeService.nowIso(),
       completions: await db.completions.toArray(),
       products: await db.products.toArray(),
       productConsumptions: await db.productConsumptions.toArray(),
@@ -418,4 +440,125 @@ export function useApexStore(selectedDate: Date) {
     exportData,
     refresh
   };
+}
+
+type ApexProcessContextInput = {
+  selectedDate: Date;
+  selectedDateKey: string;
+  nutritionLogs: NutritionLog[];
+  productConsumptions: ProductConsumption[];
+  workouts: Workout[];
+  workoutTemplates: WorkoutTemplate[];
+  bodyMeasurements: BodyMeasurement[];
+  sleepLogs: SleepLog[];
+  shoppingItems: ShoppingItem[];
+  alerts: ApexAlert[];
+  completions: TaskCompletion[];
+  agendaNotes: AgendaNote[];
+  settings: AppSettings;
+};
+
+function buildApexProcessContext(input: ApexProcessContextInput) {
+  const today = DateTimeService.todayDate();
+  const todayKey = dateKey(today);
+  const startDate = dateFromKey(APEX_PROCESS_START_DATE_KEY);
+  const selectedMonthStart = monthStart(input.selectedDate);
+  const monthContextStart = selectedMonthStart < startDate ? startDate : selectedMonthStart;
+  const selectedMonthEnd = addDays(new Date(Date.UTC(input.selectedDate.getUTCFullYear(), input.selectedDate.getUTCMonth() + 1, 1, 12)), -1);
+  const monthContextEnd = selectedMonthEnd < monthContextStart ? monthContextStart : selectedMonthEnd;
+
+  return {
+    processStartDateKey: APEX_PROCESS_START_DATE_KEY,
+    note: "No hay informacion anterior al 2026-07-01. Tratar fechas previas como fuera del proceso APEX, no como incumplimientos.",
+    todayKey,
+    selectedDateKey: input.selectedDateKey,
+    currentMonth: {
+      from: dateKey(monthContextStart),
+      to: dateKey(monthContextEnd),
+      days: buildDailyContext(monthContextStart, monthContextEnd, input, todayKey)
+    },
+    futureWeek: {
+      from: dateKey(addDays(today, 1)),
+      to: dateKey(addDays(today, 7)),
+      days: buildDailyContext(addDays(today, 1), addDays(today, 7), input, todayKey)
+    },
+    activeGoals: {
+      nutrition: input.settings.nutritionGoal ?? null,
+      training: input.settings.trainingGoal ?? null
+    },
+    pendingShopping: input.shoppingItems.filter((item) => item.status === "pending"),
+    activeAlerts: input.alerts.filter((alert) => alert.status === "active" || alert.status === "buy")
+  };
+}
+
+function buildDailyContext(start: Date, end: Date, input: ApexProcessContextInput, todayKey: string) {
+  const days = [];
+  for (let cursor = start; cursor <= end; cursor = addDays(cursor, 1)) {
+    const key = dateKey(cursor);
+    if (key < APEX_PROCESS_START_DATE_KEY) continue;
+
+    const routine = getRoutineForDate(cursor);
+    const completions = input.completions.filter((item) => item.dateKey === key);
+    const doneTaskIds = new Set(completions.filter((item) => item.done).map((item) => item.taskId));
+    const completedRoutineTasks = routine.tasks.filter((task) => doneTaskIds.has(task.id));
+    const pendingRoutineTasks = routine.tasks.filter((task) => !doneTaskIds.has(task.id));
+    const workouts = input.workouts.filter((workout) => workout.dateKey === key);
+    const nutrition = input.nutritionLogs.find((log) => log.dateKey === key);
+    const sleep = input.sleepLogs.find((log) => log.dateKey === key);
+    const agenda = input.agendaNotes.find((note) => note.dateKey === key);
+    const body = input.bodyMeasurements.find((measurement) => measurement.dateKey === key);
+    const consumptions = input.productConsumptions.filter((item) => item.dateKey === key);
+    const assignedWorkout = assignedWorkoutTemplateForDate(cursor, input.workoutTemplates);
+    const isFuture = key > todayKey;
+
+    days.push({
+      dateKey: key,
+      relationToToday: key === todayKey ? "today" : isFuture ? "future" : "past",
+      routine: {
+        status: completedRoutineTasks.length === routine.tasks.length ? "done" : isFuture ? "pending" : "incomplete",
+        plannedCount: routine.tasks.length,
+        doneCount: completedRoutineTasks.length,
+        notDoneCount: pendingRoutineTasks.length,
+        done: completedRoutineTasks.map((task) => task.label),
+        notDone: pendingRoutineTasks.map((task) => task.label)
+      },
+      nutrition: nutrition
+        ? {
+            logged: true,
+            calories: nutrition.calories,
+            protein: nutrition.protein,
+            carbs: nutrition.carbs,
+            fat: nutrition.fat,
+            fiber: nutrition.fiber ?? 0,
+            waterMl: nutrition.waterMl,
+            meals: nutrition.meals?.map((meal) => meal.name) ?? [],
+            planDone: nutrition.planItems?.filter((item) => item.done).map((item) => item.name) ?? [],
+            planNotDone: nutrition.planItems?.filter((item) => !item.done).map((item) => item.name) ?? []
+          }
+        : { logged: false },
+      training: {
+        planned: assignedWorkout
+          ? {
+              name: assignedWorkout.name,
+              group: assignedWorkout.group,
+              focus: assignedWorkout.focus,
+              exercises: assignedWorkout.exercises.map((exercise) => exercise.name)
+            }
+          : null,
+        registered: workouts.map((workout) => ({
+          title: workout.title,
+          focus: workout.focus,
+          completed: Boolean(workout.completed),
+          doneExercises: workout.exercises.filter((exercise) => exercise.completed).map((exercise) => exercise.name),
+          notDoneExercises: workout.exercises.filter((exercise) => !exercise.completed).map((exercise) => exercise.name)
+        })),
+        status: workouts.some((workout) => workout.completed) ? "done" : isFuture ? "pending" : "not_done_or_not_logged"
+      },
+      sleep: sleep ? { logged: true, sleepTime: sleep.sleepTime, wakeTime: sleep.wakeTime, durationMinutes: sleep.durationMinutes } : { logged: false },
+      body: body ? { logged: true, weightKg: body.weightKg, goal: body.goal, bodyFatPercent: body.bodyFatPercent ?? null } : { logged: false },
+      productConsumptions: consumptions.map((item) => ({ productId: item.productId, amount: item.amount, note: item.note ?? null })),
+      agendaNote: agenda?.note ?? null
+    });
+  }
+  return days;
 }

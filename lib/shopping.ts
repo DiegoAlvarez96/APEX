@@ -1,4 +1,5 @@
 import { productDisplayName } from "@/lib/stock";
+import { DateTimeService } from "@/lib/date";
 import type { ProductGroup, ProductStockSummary, ShoppingItem } from "@/types/apex";
 
 export function inferProductGroup(category: string, name: string): ProductGroup {
@@ -19,8 +20,8 @@ export function buildShoppingSuggestions(stock: ProductStockSummary[], existing:
       status: "pending",
       source: "stock",
       productId: summary.product.id,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      createdAt: DateTimeService.nowIso(),
+      updatedAt: DateTimeService.nowIso()
     } satisfies Omit<ShoppingItem, "id">))
     .filter((item) => !existingTitles.has(item.title.toLowerCase()));
 }

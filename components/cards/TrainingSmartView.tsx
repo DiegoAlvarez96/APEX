@@ -1,13 +1,18 @@
 "use client";
 
-import { Check, Copy, Dumbbell, Pencil, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Check, Copy, Dumbbell, Pencil, Plus, Replace, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui/Card";
+import { DateNavigator } from "@/components/ui/DateNavigator";
 import { InlineStatus, LoadingButton } from "@/components/ui/Loading";
-import { cloneTemplateExercises, defaultWorkoutTemplates } from "@/lib/trainingTemplates";
+import { DateTimeService } from "@/lib/date";
+import { assignedWorkoutTemplateForDate, cloneTemplateExercises, defaultWorkoutTemplates } from "@/lib/trainingTemplates";
 import type { Workout, WorkoutExercise, WorkoutTemplate } from "@/types/apex";
 
 export function TrainingSmartView({
+  selectedDate,
+  selectedDateKey,
+  onSelectDate,
   workouts,
   onAddWorkout,
   onUpdateWorkout,
@@ -17,8 +22,11 @@ export function TrainingSmartView({
   onAddTemplate,
   onDeleteTemplate
 }: {
+  selectedDate: Date;
+  selectedDateKey: string;
+  onSelectDate: (date: Date) => void;
   workouts: Workout[];
-  onAddWorkout: (workout: Omit<Workout, "id" | "dateKey" | "createdAt">) => Promise<void> | void;
+  onAddWorkout: (workout: Omit<Workout, "id" | "createdAt">) => Promise<void> | void;
   onUpdateWorkout: (id: number, workout: Partial<Workout>) => Promise<void> | void;
   onDeleteWorkout: (id: number) => Promise<void> | void;
   onDuplicateWorkout: (workout: Workout) => Promise<void> | void;
@@ -26,19 +34,40 @@ export function TrainingSmartView({
   onAddTemplate: (template: Omit<WorkoutTemplate, "id" | "createdAt" | "updatedAt">) => Promise<void> | void;
   onDeleteTemplate: (id: number) => Promise<void> | void;
 }) {
-  const [editing, setEditing] = useState<Workout>();
-  const [title, setTitle] = useState("Espalda");
-  const [focus, setFocus] = useState("Fuerza");
-  const [intensity, setIntensity] = useState<Workout["intensity"]>(4);
-  const [notes, setNotes] = useState("");
-  const [group, setGroup] = useState("Espalda");
-  const [loading, setLoading] = useState<"workout" | "template" | undefined>();
-  const [status, setStatus] = useState<{ message?: string; tone?: "info" | "success" | "error" }>({});
-  const [rawExercises, setRawExercises] = useState("Dominadas 4x10x0 rir2 rest90\nRemo con barra 4x12x40 rir2 rest90\nJalon al pecho 4x10x45 rir2 rest75\nPullover 3x15x20 rir1 rest60\nPeso muerto 4x8x80 rir2 rest120");
   const allTemplates = useMemo(() => [...templates, ...defaultWorkoutTemplates], [templates]);
+  const assignedTemplate = useMemo(() => assignedWorkoutTemplateForDate(selectedDate, templates), [selectedDate, templates]);
+  const [editing, setEditing] = useState<Workout>();
+  const [title, setTitle] = useState(assignedTemplate.group);
+  const [focus, setFocus] = useState(assignedTemplate.focus);
+  const [intensity, setIntensity] = useState<Workout["intensity"]>(assignedTemplate.intensity);
+  const [notes, setNotes] = useState(assignedTemplate.notes ?? "");
+  const [group, setGroup] = useState(assignedTemplate.group);
+  const [loading, setLoading] = useState<"workout" | "template" | "complete" | undefined>();
+  const [status, setStatus] = useState<{ message?: string; tone?: "info" | "success" | "error" }>({});
+  const [rawExercises, setRawExercises] = useState(templateToRaw(assignedTemplate));
   const groups = Array.from(new Set(allTemplates.map((template) => template.group)));
   const groupTemplates = allTemplates.filter((template) => template.group === group);
-  const preview = parseExercises(rawExercises);
+
+  useEffect(() => {
+    const firstWorkout = workouts[0];
+    if (firstWorkout) {
+      setEditing(firstWorkout);
+      setTitle(firstWorkout.title);
+      setFocus(firstWorkout.focus);
+      setIntensity(firstWorkout.intensity);
+      setNotes(firstWorkout.notes ?? "");
+      setGroup(firstWorkout.title);
+      setRawExercises(firstWorkout.exercises.map(exerciseToRaw).join("\n"));
+      return;
+    }
+    setTitle(assignedTemplate.group);
+    setFocus(assignedTemplate.focus);
+    setIntensity(assignedTemplate.intensity);
+    setNotes(assignedTemplate.notes ?? "");
+    setGroup(assignedTemplate.group);
+    setRawExercises(templateToRaw(assignedTemplate));
+    setEditing(undefined);
+  }, [assignedTemplate, selectedDateKey, workouts]);
 
   function load(workout: Workout) {
     setEditing(workout);
@@ -46,28 +75,29 @@ export function TrainingSmartView({
     setFocus(workout.focus);
     setIntensity(workout.intensity);
     setNotes(workout.notes ?? "");
-    setRawExercises(workout.exercises.map((exercise) => `${exercise.name} ${exercise.sets.length}x${exercise.sets[0]?.reps ?? 10}x${exercise.sets[0]?.weight ?? 0} rir${exercise.sets[0]?.rir ?? 2} rest${exercise.sets[0]?.restSeconds ?? 90}`).join("\n"));
+    setGroup(workout.title);
+    setRawExercises(workout.exercises.map(exerciseToRaw).join("\n"));
   }
 
-  function applyTemplate(template: WorkoutTemplate) {
+  function applyTemplate(template: WorkoutTemplate, notify = true) {
     setTitle(template.group);
     setFocus(template.focus);
     setIntensity(template.intensity);
     setNotes(template.notes ?? "");
+    setGroup(template.group);
     setRawExercises(templateToRaw(template));
-    setStatus({ message: `${template.name} cargada. Podes editar antes de guardar.`, tone: "success" });
+    if (notify) setStatus({ message: `${template.name} cargada para ${selectedDateKey}.`, tone: "success" });
   }
 
   async function submit() {
     const exercises = parseExercises(rawExercises);
     if (!title.trim() || exercises.length === 0) return;
-    const payload = { title, focus, intensity, notes, exercises };
+    const payload = { dateKey: selectedDateKey, title, focus, intensity, notes, exercises, completed: exercises.every((exercise) => exercise.completed) };
     setLoading("workout");
     setStatus({ message: editing ? "Guardando cambios..." : "Guardando entrenamiento...", tone: "info" });
     try {
       if (editing?.id) await onUpdateWorkout(editing.id, payload);
       else await onAddWorkout(payload);
-      setEditing(undefined);
       setStatus({ message: "Entrenamiento guardado.", tone: "success" });
     } catch {
       setStatus({ message: "No se pudo guardar el entrenamiento.", tone: "error" });
@@ -91,11 +121,43 @@ export function TrainingSmartView({
     }
   }
 
+  async function toggleExercise(workout: Workout, exerciseIndex: number) {
+    if (!workout.id) return;
+    const exercises = workout.exercises.map((item, itemIndex) => {
+      if (itemIndex !== exerciseIndex) return item;
+      const completed = !item.completed;
+      return { ...item, completed, sets: item.sets.map((set) => ({ ...set, completed })) };
+    });
+    await onUpdateWorkout(workout.id, { exercises, completed: exercises.every((exercise) => exercise.completed) });
+  }
+
+  async function markWorkoutCompleted(workout: Workout) {
+    if (!workout.id) return;
+    setLoading("complete");
+    const completed = !workout.completed;
+    const exercises = workout.exercises.map((exercise) => ({ ...exercise, completed, sets: exercise.sets.map((set) => ({ ...set, completed })) }));
+    try {
+      await onUpdateWorkout(workout.id, { completed, exercises });
+    } finally {
+      setLoading(undefined);
+    }
+  }
+
   return (
     <div className="space-y-5">
-      <header className="px-1 pt-2"><p className="text-sm text-white/45 light:text-black/45">Diario de gimnasio</p><h1 className="text-3xl font-semibold">Entrenamiento</h1></header>
+      <DateNavigator title="Entrenamiento" eyebrow="Rutina del dia e historial" selectedDate={selectedDate} onSelectDate={onSelectDate} />
+
       <Card>
-        <SectionTitle title="Plantillas" eyebrow="Carga rapida" />
+        <SectionTitle title="Planificacion semanal" eyebrow="Agenda compartida" />
+        <div className="rounded-2xl bg-limeglass/15 p-4 light:bg-black/[0.04]">
+          <p className="text-sm text-white/55 light:text-black/55">Asignado para {selectedDateKey}</p>
+          <p className="mt-1 text-xl font-semibold">{assignedTemplate.group} - {assignedTemplate.focus}</p>
+          <p className="mt-2 text-sm text-white/55 light:text-black/55">{assignedTemplate.exercises.length} ejercicios - intensidad {assignedTemplate.intensity}</p>
+        </div>
+      </Card>
+
+      <Card>
+        <SectionTitle title="Plantillas" eyebrow="Cambiar rutina del dia" />
         <div className="grid gap-3">
           <select className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={group} onChange={(event) => setGroup(event.target.value)}>
             {groups.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -107,14 +169,15 @@ export function TrainingSmartView({
                   <span className="block font-semibold">{template.name}</span>
                   <span className="text-xs text-white/45 light:text-black/45">{template.focus} - {template.exercises.length} ejercicios</span>
                 </button>
-                {template.source === "user" && template.id ? <button type="button" onClick={() => void onDeleteTemplate(template.id!)}><Trash2 size={16} /></button> : null}
+                {template.source === "user" && template.id ? <button type="button" onClick={() => void onDeleteTemplate(template.id!)} aria-label="Eliminar plantilla"><Trash2 size={16} /></button> : null}
               </div>
             ))}
           </div>
         </div>
       </Card>
+
       <Card>
-        <SectionTitle title={editing ? "Editar sesion" : "Registrar sesion"} eyebrow="Peso, reps, RIR y descanso" />
+        <SectionTitle title={editing ? "Editar entrenamiento del dia" : "Registrar entrenamiento del dia"} eyebrow={selectedDateKey} />
         <div className="grid gap-3">
           <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={title} onChange={(event) => setTitle(event.target.value)} />
           <div className="grid grid-cols-2 gap-3">
@@ -133,49 +196,59 @@ export function TrainingSmartView({
           <InlineStatus message={status.message} tone={status.tone} />
         </div>
       </Card>
-      <Card>
-        <SectionTitle title="Rutina diaria" eyebrow="Checklist" />
-        <div className="space-y-2">
-          {preview.map((exercise) => (
-            <div key={exercise.id} className="flex items-center justify-between rounded-2xl bg-white/[0.06] p-3 text-sm light:bg-black/[0.04]">
-              <span>{exercise.name} - {exercise.sets.length}x{exercise.sets[0]?.reps} - {exercise.sets[0]?.weight ?? 0} kg</span>
-              <Check className="text-white/35 light:text-black/35" size={17} />
-            </div>
-          ))}
-        </div>
-      </Card>
+
       <div className="space-y-3">
         {workouts.map((workout) => (
           <Card key={workout.id} className="p-4">
             <div className="flex items-start gap-3">
               <div className="grid size-11 place-items-center rounded-2xl bg-white/[0.08] light:bg-black/[0.05]"><Dumbbell className="text-limeglass" size={20} /></div>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold">{workout.title}</p>
-                <p className="text-sm text-white/45 light:text-black/45">{workout.focus} - intensidad {workout.intensity} - {workout.exercises.length} ejercicios</p>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold">{workout.title}</p>
+                    <p className="text-sm text-white/45 light:text-black/45">{workout.focus} - intensidad {workout.intensity} - {workout.exercises.length} ejercicios</p>
+                  </div>
+                  <LoadingButton loading={loading === "complete"} loadingLabel="" className={`grid size-9 place-items-center rounded-xl ${workout.completed ? "bg-limeglass text-black" : "bg-white/[0.08]"}`} onClick={() => void markWorkoutCompleted(workout)}>
+                    <Check size={16} />
+                  </LoadingButton>
+                </div>
                 <div className="mt-3 space-y-2 text-sm text-white/65 light:text-black/65">
                   {workout.exercises.map((exercise, index) => (
-                    <button key={exercise.id} className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left ${exercise.completed ? "bg-limeglass text-black" : "bg-white/[0.05] light:bg-black/[0.04]"}`} onClick={() => workout.id && onUpdateWorkout(workout.id, { exercises: workout.exercises.map((item, itemIndex) => itemIndex === index ? { ...item, completed: !item.completed, sets: item.sets.map((set) => ({ ...set, completed: !item.completed })) } : item) })} type="button">
+                    <button key={exercise.id} className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left ${exercise.completed ? "bg-limeglass text-black" : "bg-white/[0.05] light:bg-black/[0.04]"}`} onClick={() => void toggleExercise(workout, index)} type="button">
                       <span>{exercise.name} - {exercise.sets.length} series - {exercise.sets[0]?.reps ?? 0} reps - {exercise.sets[0]?.weight ?? 0} kg - RIR {exercise.sets[0]?.rir ?? "-"} - {exercise.sets[0]?.restSeconds ?? 0}s</span>
                       <Check size={16} />
                     </button>
                   ))}
                 </div>
+                {workout.notes ? <p className="mt-3 rounded-2xl bg-white/[0.05] p-3 text-sm text-white/55 light:bg-black/[0.04] light:text-black/55">{workout.notes}</p> : null}
               </div>
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2">
               <Action icon={Pencil} label="Editar" onClick={() => load(workout)} />
-              <Action icon={Copy} label="Duplicar" onClick={() => onDuplicateWorkout(workout)} />
-              <Action icon={Trash2} label="Eliminar" onClick={() => workout.id && onDeleteWorkout(workout.id)} />
+              <Action icon={Copy} label="Duplicar" onClick={() => void onDuplicateWorkout(workout)} />
+              <Action icon={Trash2} label="Eliminar" onClick={() => workout.id && void onDeleteWorkout(workout.id)} />
             </div>
           </Card>
         ))}
+        {workouts.length === 0 ? (
+          <Card className="p-4">
+            <div className="flex items-center gap-3 text-sm text-white/55 light:text-black/55">
+              <Replace className="text-limeglass" size={18} />
+              La plantilla asignada ya esta cargada arriba para registrar este dia.
+            </div>
+          </Card>
+        ) : null}
       </div>
     </div>
   );
 }
 
 function templateToRaw(template: WorkoutTemplate) {
-  return cloneTemplateExercises(template).map((exercise) => `${exercise.name} ${exercise.sets.length}x${exercise.sets[0]?.reps ?? 10}x${exercise.sets[0]?.weight ?? 0} rir${exercise.sets[0]?.rir ?? 2} rest${exercise.sets[0]?.restSeconds ?? 90}`).join("\n");
+  return cloneTemplateExercises(template).map(exerciseToRaw).join("\n");
+}
+
+function exerciseToRaw(exercise: WorkoutExercise) {
+  return `${exercise.name} ${exercise.sets.length}x${exercise.sets[0]?.reps ?? 10}x${exercise.sets[0]?.weight ?? 0} rir${exercise.sets[0]?.rir ?? 2} rest${exercise.sets[0]?.restSeconds ?? 90}`;
 }
 
 function Action({ icon: Icon, label, onClick }: { icon: typeof Pencil; label: string; onClick: () => void }) {
@@ -191,6 +264,6 @@ function parseExercises(value: string): WorkoutExercise[] {
     const weight = Number(match?.[4] ?? 0);
     const rir = match?.[5] ? Number(match[5]) : undefined;
     const restSeconds = match?.[6] ? Number(match[6]) : undefined;
-    return { id: `${Date.now()}-${index}`, name, completed: false, sets: Array.from({ length: sets }, () => ({ reps, weight, rir, restSeconds, completed: false })) };
+    return { id: DateTimeService.id(`exercise-${index}`), name, completed: false, sets: Array.from({ length: sets }, () => ({ reps, weight, rir, restSeconds, completed: false })) };
   });
 }

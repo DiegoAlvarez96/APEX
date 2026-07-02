@@ -1,3 +1,4 @@
+import { DateTimeService, weekdayInAppTimeZone } from "@/lib/date";
 import type { WorkoutTemplate } from "@/types/apex";
 
 function sets(reps: number, weight = 0, rir = 2, restSeconds = 90) {
@@ -66,6 +67,21 @@ export const defaultWorkoutTemplates: WorkoutTemplate[] = [
     ]
   },
   {
+    name: "Brazos 1 - Completa",
+    group: "Brazos",
+    focus: "Hipertrofia",
+    intensity: 3,
+    source: "default",
+    createdAt: "default",
+    updatedAt: "default",
+    exercises: [
+      { id: "tpl-arms-1-1", name: "Curl barra", sets: sets(10, 25, 2, 75) },
+      { id: "tpl-arms-1-2", name: "Curl inclinado", sets: sets(12, 12, 2, 60) },
+      { id: "tpl-arms-1-3", name: "Press frances", sets: sets(10, 25, 2, 75) },
+      { id: "tpl-arms-1-4", name: "Extension polea", sets: sets(12, 25, 1, 60) }
+    ]
+  },
+  {
     name: "Hombros 1 - Volumen",
     group: "Hombros",
     focus: "Hipertrofia",
@@ -85,8 +101,28 @@ export const defaultWorkoutTemplates: WorkoutTemplate[] = [
 export function cloneTemplateExercises(template: WorkoutTemplate) {
   return template.exercises.map((exercise, index) => ({
     ...exercise,
-    id: `${Date.now()}-${index}`,
+    id: DateTimeService.id(`exercise-${index}`),
     sets: exercise.sets.map((set) => ({ ...set, completed: false })),
     completed: false
   }));
+}
+
+const weeklyGroups: Record<number, string> = {
+  1: "Espalda",
+  2: "Pecho",
+  3: "Piernas",
+  4: "Hombros",
+  5: "Brazos",
+  6: "Espalda",
+  0: "Piernas"
+};
+
+export function plannedWorkoutGroupForDate(date: Date) {
+  return weeklyGroups[weekdayInAppTimeZone(date)] ?? "Espalda";
+}
+
+export function assignedWorkoutTemplateForDate(date: Date, userTemplates: WorkoutTemplate[] = []) {
+  const group = plannedWorkoutGroupForDate(date);
+  const allTemplates = [...userTemplates, ...defaultWorkoutTemplates];
+  return allTemplates.find((template) => template.group.toLowerCase() === group.toLowerCase()) ?? allTemplates[0];
 }

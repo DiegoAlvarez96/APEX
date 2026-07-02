@@ -9,7 +9,9 @@ import { addDays, dateKey, dayOfMonth, fullDate, monthStart, monthTitle, weekday
 import { buildAgendaDetail } from "@/lib/agenda";
 import { getRoutineForDate } from "@/lib/routines";
 import { formatSleepDuration } from "@/lib/sleep";
-import type { NutritionLog, ProductStockSummary, SleepLog, Workout } from "@/types/apex";
+import { assignedWorkoutTemplateForDate } from "@/lib/trainingTemplates";
+import type { BodyMeasurement, NutritionLog, ProductStockSummary, SleepLog, Workout, WorkoutTemplate } from "@/types/apex";
+import type { ViewKey } from "@/components/layout/BottomNav";
 
 export function CalendarView({
   selectedDate,
@@ -19,9 +21,12 @@ export function CalendarView({
   workouts,
   stockSummaries,
   nutrition,
+  bodyMeasurements,
+  workoutTemplates,
   previousSleep,
   note,
   onSaveNote,
+  onOpenModule,
   isDone,
   onToggle
 }: {
@@ -32,9 +37,12 @@ export function CalendarView({
   workouts: Workout[];
   stockSummaries: ProductStockSummary[];
   nutrition?: NutritionLog;
+  bodyMeasurements: BodyMeasurement[];
+  workoutTemplates: WorkoutTemplate[];
   previousSleep?: SleepLog;
   note?: string;
   onSaveNote: (note: string) => void;
+  onOpenModule: (view: ViewKey) => void;
   isDone: (taskId: string) => boolean;
   onToggle: (taskId: string) => void;
 }) {
@@ -46,6 +54,8 @@ export function CalendarView({
   const detail = buildAgendaDetail(selectedDate, workoutsForDay, stockSummaries);
   const routine = getRoutineForDate(selectedDate);
   const skincareTasks = routine.tasks.filter((task) => task.category === "skincare" || task.category === "beard" || task.category === "hair");
+  const assignedWorkout = assignedWorkoutTemplateForDate(selectedDate, workoutTemplates);
+  const bodyForDay = bodyMeasurements.find((measurement) => measurement.dateKey === selectedDateKey);
 
   useEffect(() => {
     setDraftNote(note ?? "");
@@ -108,9 +118,9 @@ export function CalendarView({
       <Card>
         <SectionTitle title={`Dia ${selectedDateLabel}`} eyebrow="Detalle del dia" />
         <div className="grid grid-cols-2 gap-2">
-          <AgendaMetric label="Skincare" value={`${skincareTasks.filter((task) => isDone(task.id)).length}/${skincareTasks.length}`} />
-          <AgendaMetric label="Nutricion" value={nutrition ? `${Math.round(nutrition.calories)} kcal` : "Sin cargar"} />
-          <AgendaMetric label="Entreno" value={workoutsForDay.length ? `${workoutsForDay.length}` : "Sin cargar"} />
+          <button className="w-full text-left" type="button" onClick={() => onOpenModule("dashboard")}><AgendaMetric label="Skincare" value={`${skincareTasks.filter((task) => isDone(task.id)).length}/${skincareTasks.length}`} /></button>
+          <button className="w-full text-left" type="button" onClick={() => onOpenModule("nutrition")}><AgendaMetric label="Nutricion" value={nutrition ? `${Math.round(nutrition.calories)} kcal` : "Sin cargar"} /></button>
+          <button className="w-full text-left" type="button" onClick={() => onOpenModule("training")}><AgendaMetric label="Entreno" value={workoutsForDay.length ? `${workoutsForDay.length}` : assignedWorkout.group} /></button>
           <AgendaMetric label="Sueno ant." value={previousSleep ? formatSleepDuration(previousSleep.durationMinutes) : "Sin cargar"} />
         </div>
         <AgendaBlock title="Suplementos" items={detail.supplements} />
@@ -118,9 +128,11 @@ export function CalendarView({
         <AgendaBlock title="Notas" items={detail.notes} />
       </Card>
 
-      <NutritionAgendaCard nutrition={nutrition} selectedDateLabel={selectedDateLabel} />
+      <NutritionAgendaCard nutrition={nutrition} selectedDateLabel={selectedDateLabel} onOpen={() => onOpenModule("nutrition")} />
 
-      <TrainingAgendaCard workouts={workoutsForDay} selectedDateLabel={selectedDateLabel} />
+      <TrainingAgendaCard workouts={workoutsForDay} assigned={assignedWorkout} selectedDateLabel={selectedDateLabel} onOpen={() => onOpenModule("training")} />
+
+      <BodyAgendaCard measurement={bodyForDay} selectedDateLabel={selectedDateLabel} onOpen={() => onOpenModule("physical")} />
 
       <SleepAgendaCard sleep={previousSleep} previousDateLabel={previousDateLabel} />
 
@@ -143,21 +155,30 @@ function AgendaMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function NutritionAgendaCard({ nutrition, selectedDateLabel }: { nutrition?: NutritionLog; selectedDateLabel: string }) {
+function NutritionAgendaCard({ nutrition, selectedDateLabel, onOpen }: { nutrition?: NutritionLog; selectedDateLabel: string; onOpen: () => void }) {
   const planTotal = nutrition?.planItems?.length ?? 0;
   const planDone = nutrition?.planItems?.filter((item) => item.done).length ?? 0;
   return (
     <Card>
-      <SectionTitle title="Nutricion" eyebrow={selectedDateLabel} />
+      <button className="mb-4 w-full text-left" type="button" onClick={onOpen}>
+        <SectionTitle title="Nutricion" eyebrow={selectedDateLabel} />
+      </button>
       {nutrition ? (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <AgendaMetric label="Calorias" value={`${Math.round(nutrition.calories)} kcal`} />
             <AgendaMetric label="Proteina" value={`${Math.round(nutrition.protein)} g`} />
             <AgendaMetric label="Carbos" value={`${Math.round(nutrition.carbs)} g`} />
+            <AgendaMetric label="Grasas" value={`${Math.round(nutrition.fat)} g`} />
+            <AgendaMetric label="Fibra" value={`${Math.round(nutrition.fiber ?? 0)} g`} />
             <AgendaMetric label="Agua" value={`${(nutrition.waterMl / 1000).toFixed(1)} L`} />
           </div>
           <p className="text-sm text-white/50 light:text-black/50">Plan: {planDone}/{planTotal || "-"} items completados.</p>
+          {nutrition.drinks?.slice(0, 4).map((drink) => (
+            <div key={drink.id} className="rounded-2xl bg-white/[0.06] px-3 py-2 text-sm light:bg-black/[0.04]">
+              {drink.type} - {drink.label} - {drink.amountMl} ml
+            </div>
+          ))}
           {nutrition.meals?.slice(0, 5).map((meal) => (
             <div key={meal.id} className="rounded-2xl bg-white/[0.06] px-3 py-2 text-sm light:bg-black/[0.04]">
               {meal.name} - {Math.round(meal.calories)} kcal
@@ -171,16 +192,18 @@ function NutritionAgendaCard({ nutrition, selectedDateLabel }: { nutrition?: Nut
   );
 }
 
-function TrainingAgendaCard({ workouts, selectedDateLabel }: { workouts: Workout[]; selectedDateLabel: string }) {
+function TrainingAgendaCard({ workouts, assigned, selectedDateLabel, onOpen }: { workouts: Workout[]; assigned: WorkoutTemplate; selectedDateLabel: string; onOpen: () => void }) {
   return (
     <Card>
-      <SectionTitle title="Entrenamiento" eyebrow={selectedDateLabel} />
+      <button className="mb-4 w-full text-left" type="button" onClick={onOpen}>
+        <SectionTitle title="Entrenamiento" eyebrow={selectedDateLabel} />
+      </button>
       {workouts.length ? (
         <div className="space-y-3">
           {workouts.map((workout) => (
             <div key={workout.id} className="rounded-2xl bg-white/[0.06] p-3 light:bg-black/[0.04]">
               <p className="text-sm font-semibold">{workout.title}</p>
-              <p className="mt-1 text-xs text-white/45 light:text-black/45">{workout.focus} - intensidad {workout.intensity} - {workout.exercises.length} ejercicios</p>
+              <p className="mt-1 text-xs text-white/45 light:text-black/45">{workout.focus} - intensidad {workout.intensity} - {workout.exercises.length} ejercicios - {workout.completed ? "completado" : "pendiente"}</p>
               {workout.exercises.slice(0, 4).map((exercise) => (
                 <p key={exercise.id} className="mt-2 text-xs text-white/55 light:text-black/55">
                   {exercise.name} - {exercise.sets.length} series
@@ -190,7 +213,30 @@ function TrainingAgendaCard({ workouts, selectedDateLabel }: { workouts: Workout
           ))}
         </div>
       ) : (
-        <p className="text-sm text-white/45 light:text-black/45">No hay entrenamiento registrado para este dia.</p>
+        <div className="rounded-2xl bg-white/[0.06] p-3 light:bg-black/[0.04]">
+          <p className="text-sm font-semibold">{assigned.group} - {assigned.focus}</p>
+          <p className="mt-1 text-xs text-white/45 light:text-black/45">Planificado automaticamente - pendiente de registrar.</p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function BodyAgendaCard({ measurement, selectedDateLabel, onOpen }: { measurement?: BodyMeasurement; selectedDateLabel: string; onOpen: () => void }) {
+  return (
+    <Card>
+      <button className="mb-4 w-full text-left" type="button" onClick={onOpen}>
+        <SectionTitle title="Fisico" eyebrow={selectedDateLabel} />
+      </button>
+      {measurement ? (
+        <div className="grid grid-cols-2 gap-2">
+          <AgendaMetric label="Peso" value={`${measurement.weightKg} kg`} />
+          <AgendaMetric label="Cintura" value={measurement.waistCm ? `${measurement.waistCm} cm` : "-"} />
+          <AgendaMetric label="Grasa" value={measurement.bodyFatPercent ? `${measurement.bodyFatPercent}%` : "-"} />
+          <AgendaMetric label="Notas" value={measurement.notes ? "Si" : "-"} />
+        </div>
+      ) : (
+        <p className="text-sm text-white/45 light:text-black/45">No hay medicion fisica registrada para este dia.</p>
       )}
     </Card>
   );

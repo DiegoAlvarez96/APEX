@@ -3,6 +3,7 @@
 import { Dumbbell, Plus } from "lucide-react";
 import { useState } from "react";
 import { Card, SectionTitle } from "@/components/ui/Card";
+import { DateTimeService } from "@/lib/date";
 import type { Workout, WorkoutExercise } from "@/types/apex";
 
 export function TrainingView({
@@ -82,7 +83,7 @@ function parseExercises(value: string): WorkoutExercise[] {
       const sets = Number(match?.[2] ?? 1);
       const reps = Number(match?.[3] ?? 10);
       return {
-        id: `${Date.now()}-${index}`,
+        id: DateTimeService.id(`exercise-${index}`),
         name,
         sets: Array.from({ length: sets }, () => ({ reps }))
       };

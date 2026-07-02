@@ -125,6 +125,11 @@ export type NutritionPlanItem = {
   meal: "Desayuno" | "Almuerzo" | "Merienda" | "Cena";
   name: string;
   done: boolean;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  fiber?: number;
 };
 
 export type DrinkEntry = {
@@ -132,6 +137,11 @@ export type DrinkEntry = {
   type: DrinkType;
   amountMl: number;
   label: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  fiber?: number;
 };
 
 export type FoodCacheItem = {
@@ -166,7 +176,9 @@ export type Workout = {
   durationMinutes?: number;
   exercises: WorkoutExercise[];
   notes?: string;
+  completed?: boolean;
   createdAt: string;
+  updatedAt?: string;
 };
 
 export type WorkoutTemplate = {
@@ -250,6 +262,20 @@ export type ProgressPhoto = {
   note?: string;
   createdAt: string;
 };
+
+export type FoodVisionOption = {
+  label: string;
+  confidence?: number;
+};
+
+export type FoodVisionResult =
+  | FoodEntry[]
+  | {
+      status: "confirm";
+      message?: string;
+      options: FoodVisionOption[];
+      foods?: FoodEntry[];
+    };
 
 export type AppSettings = {
   id: "settings";

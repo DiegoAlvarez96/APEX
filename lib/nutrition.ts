@@ -1,4 +1,5 @@
-import type { FoodEntry, NutritionLog, NutritionPlanItem } from "@/types/apex";
+import { DateTimeService } from "@/lib/date";
+import type { DrinkEntry, DrinkType, FoodEntry, NutritionLog, NutritionPlanItem } from "@/types/apex";
 
 type FoodPreset = Omit<FoodEntry, "id" | "estimated" | "source"> & { aliases: string[] };
 
@@ -9,7 +10,12 @@ export const foodPresets: FoodPreset[] = [
   { name: "Arroz cocido 150 g", aliases: ["arroz"], calories: 195, protein: 4.1, carbs: 42, fat: 0.4, fiber: 0.6 },
   { name: "Leche 250 ml", aliases: ["leche"], calories: 122, protein: 8, carbs: 12, fat: 4.8, fiber: 0 },
   { name: "Avena 50 g", aliases: ["avena"], calories: 190, protein: 6.5, carbs: 33, fat: 3.5, fiber: 5 },
-  { name: "Proteina whey 35 g", aliases: ["proteina", "whey"], calories: 135, protein: 27, carbs: 3, fat: 2, fiber: 0 }
+  { name: "Proteina whey 35 g", aliases: ["proteina", "whey", "whey protein"], calories: 135, protein: 27, carbs: 3, fat: 2, fiber: 0 },
+  { name: "Verduras 200 g", aliases: ["verduras", "vegetales"], calories: 70, protein: 4, carbs: 12, fat: 0.8, fiber: 6 },
+  { name: "Yogur 190 g", aliases: ["yogur", "yogurt"], calories: 120, protein: 8, carbs: 16, fat: 2, fiber: 0 },
+  { name: "Frutos secos 30 g", aliases: ["frutos secos", "nueces", "almendras"], calories: 185, protein: 6, carbs: 6, fat: 16, fiber: 3 },
+  { name: "Carne magra 180 g", aliases: ["carne", "bife"], calories: 360, protein: 46, carbs: 0, fat: 18, fiber: 0 },
+  { name: "Ensalada completa", aliases: ["ensalada"], calories: 90, protein: 3, carbs: 11, fat: 4, fiber: 5 }
 ];
 
 export function suggestFoods(query: string) {
@@ -65,6 +71,72 @@ export function sumMeals(meals: FoodEntry[]): Omit<NutritionLog, "id" | "dateKey
   );
 }
 
+export function calculateNutritionTotals(meals: FoodEntry[], planItems: NutritionPlanItem[] = [], drinks: DrinkEntry[] = []) {
+  const completedPlanFoods = planItems.filter((item) => item.done).map(planItemToFood);
+  const drinkFoods = drinks.map(drinkToFoodEntry);
+  return sumMeals([...completedPlanFoods, ...meals, ...drinkFoods]);
+}
+
+export function normalizeNutritionLog(log: NutritionLog): NutritionLog {
+  const totals = calculateNutritionTotals(log.meals ?? [], log.planItems ?? [], log.drinks ?? []);
+  return {
+    ...log,
+    calories: totals.calories,
+    protein: totals.protein,
+    carbs: totals.carbs,
+    fat: totals.fat,
+    fiber: totals.fiber,
+    waterMl: (log.drinks ?? []).filter((drink) => drink.type === "water").reduce((sum, drink) => sum + drink.amountMl, 0)
+  };
+}
+
+export function planItemToFood(item: NutritionPlanItem): FoodEntry {
+  const preset = findFoodPreset(item.name);
+  return {
+    id: `plan-food-${item.id}`,
+    name: item.name,
+    calories: item.calories ?? preset?.calories ?? 0,
+    protein: item.protein ?? preset?.protein ?? 0,
+    carbs: item.carbs ?? preset?.carbs ?? 0,
+    fat: item.fat ?? preset?.fat ?? 0,
+    fiber: item.fiber ?? preset?.fiber ?? 0,
+    estimated: !preset,
+    source: "text",
+    calculationMethod: preset ? "database" : "fallback"
+  };
+}
+
+export function drinkNutrition(type: DrinkType, amountMl: number) {
+  const factor = amountMl / 100;
+  const per100: Record<DrinkType, { calories: number; protein: number; carbs: number; fat: number; fiber: number }> = {
+    water: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+    soda: { calories: 42, protein: 0, carbs: 10.5, fat: 0, fiber: 0 },
+    juice: { calories: 45, protein: 0.2, carbs: 10.8, fat: 0, fiber: 0.2 },
+    isotonic: { calories: 24, protein: 0, carbs: 6, fat: 0, fiber: 0 },
+    alcohol: { calories: 70, protein: 0, carbs: 3, fat: 0, fiber: 0 },
+    other: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
+  };
+  const base = per100[type];
+  return {
+    calories: base.calories * factor,
+    protein: base.protein * factor,
+    carbs: base.carbs * factor,
+    fat: base.fat * factor,
+    fiber: base.fiber * factor
+  };
+}
+
+export function createDrinkEntry(type: DrinkType, amount: number, unit: "ml" | "cc" | "l"): DrinkEntry {
+  const amountMl = drinkToMl(amount, unit);
+  return {
+    id: DateTimeService.id("drink"),
+    type,
+    amountMl,
+    label: `${amount} ${unit}`,
+    ...drinkNutrition(type, amountMl)
+  };
+}
+
 function matchPreset(name: string) {
   const normalized = name.toLowerCase();
   return foodPresets.find((food) => food.name.toLowerCase().includes(normalized) || food.aliases.some((alias) => normalized.includes(alias))) ?? foodPresets[0];
@@ -73,7 +145,7 @@ function matchPreset(name: string) {
 export function unknownFoodEntry(name: string): FoodEntry {
   const parsed = parseFoodQuery(name);
   return {
-    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    id: DateTimeService.id("food"),
     name: parsed.name,
     inputText: name,
     amount: parsed.amount,
@@ -87,7 +159,7 @@ export function unknownFoodEntry(name: string): FoodEntry {
     estimated: true,
     source: "text",
     calculationMethod: "manual",
-    createdAt: new Date().toISOString()
+    createdAt: DateTimeService.nowIso()
   };
 }
 
@@ -111,10 +183,38 @@ export function drinkToMl(amount: number, unit: "ml" | "cc" | "l") {
   return amount;
 }
 
-function toFoodEntry(food: FoodPreset, source: FoodEntry["source"], label?: string): FoodEntry {
+function drinkToFoodEntry(drink: DrinkEntry): FoodEntry {
+  const macros = drink.calories === undefined ? drinkNutrition(drink.type, drink.amountMl) : drink;
+  return {
+    id: `drink-food-${drink.id}`,
+    name: drinkLabel(drink.type),
+    amountLabel: drink.label,
+    calories: macros.calories ?? 0,
+    protein: macros.protein ?? 0,
+    carbs: macros.carbs ?? 0,
+    fat: macros.fat ?? 0,
+    fiber: macros.fiber ?? 0,
+    estimated: false,
+    source: "text",
+    calculationMethod: "database"
+  };
+}
+
+function drinkLabel(type: DrinkType) {
+  return {
+    water: "Agua",
+    soda: "Gaseosa",
+    juice: "Jugo",
+    isotonic: "Isotonica",
+    alcohol: "Alcohol",
+    other: "Bebida"
+  }[type];
+}
+
+export function toFoodEntry(food: FoodPreset, source: FoodEntry["source"], label?: string): FoodEntry {
   const parsed = parseFoodQuery(label ?? food.name);
   return {
-    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    id: DateTimeService.id("food"),
     name: label ?? food.name,
     inputText: label ?? food.name,
     amount: parsed.amount,
@@ -128,6 +228,6 @@ function toFoodEntry(food: FoodPreset, source: FoodEntry["source"], label?: stri
     estimated: source === "photo" || source === "text",
     source,
     calculationMethod: source === "photo" ? "photo" : "database",
-    createdAt: new Date().toISOString()
+    createdAt: DateTimeService.nowIso()
   };
 }

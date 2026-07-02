@@ -3,15 +3,17 @@
 import { motion } from "framer-motion";
 import { Activity, CalendarCheck, Droplets, Flame, GlassWater, RollerCoaster, Scale, Utensils } from "lucide-react";
 import { Card, SectionTitle } from "@/components/ui/Card";
+import { DateNavigator } from "@/components/ui/DateNavigator";
 import { ProgressRing } from "@/components/cards/ProgressRing";
 import { TaskList } from "@/components/cards/TaskList";
-import { prettyDate, slotForHour, slotLabel } from "@/lib/date";
+import { DateTimeService, slotForHour, slotLabel } from "@/lib/date";
 import { getRoutineForDate } from "@/lib/routines";
 import { formatSleepDuration } from "@/lib/sleep";
 import type { NutritionLog, ProductStockSummary, SleepLog, Workout } from "@/types/apex";
 
 export function Dashboard({
   selectedDate,
+  onSelectDate,
   isDone,
   onToggle,
   nutrition,
@@ -20,6 +22,7 @@ export function Dashboard({
   sleep
 }: {
   selectedDate: Date;
+  onSelectDate: (date: Date) => void;
   isDone: (taskId: string) => boolean;
   onToggle: (taskId: string) => void;
   nutrition?: NutritionLog;
@@ -28,7 +31,7 @@ export function Dashboard({
   sleep?: SleepLog;
 }) {
   const routine = getRoutineForDate(selectedDate);
-  const currentSlot = slotForHour(new Date());
+  const currentSlot = slotForHour(DateTimeService.now());
   const doneCount = routine.tasks.filter((task) => isDone(task.id)).length;
   const progress = routine.tasks.length ? (doneCount / routine.tasks.length) * 100 : 0;
   const oral = routine.tasks.find((task) => task.label.toLowerCase().includes("oral"));
@@ -37,10 +40,7 @@ export function Dashboard({
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
-      <header className="px-1 pt-2">
-        <p className="text-sm font-medium capitalize text-white/50 light:text-black/50">{prettyDate(selectedDate)}</p>
-        <h1 className="mt-1 text-4xl font-semibold tracking-normal text-white light:text-black">Buenos dias Diego</h1>
-      </header>
+      <DateNavigator title="Skincare" eyebrow="Rutina y habitos del dia" selectedDate={selectedDate} onSelectDate={onSelectDate} />
 
       <Card className="flex items-center justify-between gap-5">
         <div>
@@ -50,7 +50,7 @@ export function Dashboard({
             {doneCount} de {routine.tasks.length} acciones completadas. El checklist cambia solo cada dia.
           </p>
         </div>
-        <ProgressRing value={progress} label="Progreso" />
+        <ProgressRing value={progress} label="Progreso total del dia" />
       </Card>
 
       {(["morning", "afternoon", "night"] as const).map((slot) => (

@@ -3,28 +3,38 @@
 import { Bell, Bot, RefreshCw, Settings } from "lucide-react";
 import { useState } from "react";
 import { Spinner } from "@/components/ui/Loading";
+import { DateTimeService } from "@/lib/date";
 import type { ViewKey } from "@/components/layout/BottomNav";
 
-export function AppHeader({ onNavigate }: { onNavigate: (view: ViewKey) => void }) {
+export function AppHeader({ onNavigate, onRefresh }: { onNavigate: (view: ViewKey) => void; onRefresh?: () => Promise<void> | void }) {
   const [updateState, setUpdateState] = useState<"idle" | "checking" | "done" | "error">("idle");
 
   async function updateApp() {
-    if (!("serviceWorker" in navigator)) {
-      setUpdateState("error");
-      window.setTimeout(() => setUpdateState("idle"), 2200);
-      return;
-    }
     setUpdateState("checking");
     try {
-      const registration = await navigator.serviceWorker.ready;
-      await registration.update();
-      const worker = registration.waiting ?? registration.installing;
-      if (worker) worker.postMessage({ type: "SKIP_WAITING" });
+      if ("serviceWorker" in navigator) {
+        const registration = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<ServiceWorkerRegistration | undefined>((resolve) => window.setTimeout(() => resolve(undefined), 2500))
+        ]);
+        await registration?.update();
+        const worker = registration?.waiting ?? registration?.installing;
+        if (worker) worker.postMessage({ type: "SKIP_WAITING" });
+      }
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+      await onRefresh?.();
       setUpdateState("done");
-      window.setTimeout(() => window.location.reload(), 700);
+      window.setTimeout(() => {
+        const url = new URL(window.location.href);
+        url.searchParams.set("apexRefresh", DateTimeService.id("update"));
+        window.location.replace(url.toString());
+      }, 650);
     } catch {
       setUpdateState("error");
-      window.setTimeout(() => setUpdateState("idle"), 2400);
+      window.setTimeout(() => window.location.reload(), 900);
     }
   }
 

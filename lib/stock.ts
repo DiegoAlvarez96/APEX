@@ -1,4 +1,4 @@
-import { addDays, dateKey } from "@/lib/date";
+import { DateTimeService, addDays, dateKey } from "@/lib/date";
 import type { ApexAlert, Product, ProductConsumption, ProductStockSummary } from "@/types/apex";
 
 const dayMs = 24 * 60 * 60 * 1000;
@@ -27,7 +27,7 @@ export function summarizeProductStock(product: Product, consumptions: ProductCon
   const monthlyConsumption =
     consumed > 0 ? productConsumptions.filter((item) => daysBetween(item.dateKey, dateKey()) <= 29).reduce((sum, item) => sum + item.amount, 0) : estimatedDaily * 30;
   const estimatedDaysLeft = dailyAverage > 0 ? Math.max(0, Math.floor(currentStock / dailyAverage)) : null;
-  const estimatedRestockDate = estimatedDaysLeft === null ? null : dateKey(addDays(new Date(), estimatedDaysLeft));
+  const estimatedRestockDate = estimatedDaysLeft === null ? null : dateKey(addDays(DateTimeService.todayDate(), estimatedDaysLeft));
 
   return {
     product: { ...product, quantity: currentStock },
@@ -76,8 +76,8 @@ export function buildStockAlerts(summaries: ProductStockSummary[], existing: Ape
         source: "stock",
         productId: summary.product.id,
         dueDateKey: summary.estimatedRestockDate ?? undefined,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: DateTimeService.nowIso(),
+        updatedAt: DateTimeService.nowIso()
       });
       return alerts;
     }, []);

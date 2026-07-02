@@ -1,8 +1,18 @@
 import { NextResponse } from "next/server";
+import { DateTimeService } from "@/lib/date";
 import { findFoodPreset, parseFoodQuery, unknownFoodEntry } from "@/lib/nutrition";
 import type { FoodEntry } from "@/types/apex";
 
 export const runtime = "nodejs";
+
+const FOOD_TEXT_SYSTEM_PROMPT = [
+  "Estima los macros del alimento indicado por el usuario usando la cantidad y unidad recibidas.",
+  "Responde exclusivamente con JSON valido. No incluyas markdown, explicaciones ni texto adicional.",
+  "El JSON debe tener exactamente estas claves: name, amountLabel, calories, protein, carbs, fat, fiber.",
+  "Usa numeros para calories, protein, carbs, fat y fiber. Los macros deben corresponder a la porcion indicada, no a 100 g salvo que la porcion sea 100 g.",
+  "Si la cantidad o unidad es ambigua, estima una porcion razonable y reflejala en amountLabel.",
+  "Ejemplo de respuesta valida: {\"name\":\"Pechuga de pollo\",\"amountLabel\":\"150 g\",\"calories\":248,\"protein\":46.5,\"carbs\":0,\"fat\":5.4,\"fiber\":0}"
+].join(" ");
 
 export async function POST(request: Request) {
   const { text } = (await request.json()) as { text?: string };
@@ -13,7 +23,7 @@ export async function POST(request: Request) {
   const parsedQuery = parseFoodQuery(query);
   if (preset) {
     return NextResponse.json({
-      id: `${Date.now()}-${query}`,
+      id: DateTimeService.id("food"),
       name: query,
       inputText: query,
       amount: parsedQuery.amount,
@@ -27,7 +37,7 @@ export async function POST(request: Request) {
       estimated: false,
       source: "text",
       calculationMethod: "database",
-      createdAt: new Date().toISOString()
+      createdAt: DateTimeService.nowIso()
     } satisfies FoodEntry);
   }
 
@@ -40,7 +50,7 @@ export async function POST(request: Request) {
     body: JSON.stringify({
       model: "gpt-4.1-mini",
       input: [
-        { role: "system", content: "Estima macros de un alimento segun cantidad y unidad. Responde solo JSON valido con name, amountLabel, calories, protein, carbs, fat, fiber." },
+        { role: "system", content: FOOD_TEXT_SYSTEM_PROMPT },
         { role: "user", content: JSON.stringify({ original: query, alimento: parsedQuery.name, cantidad: parsedQuery.amount, unidad: parsedQuery.unit }) }
       ]
     })
@@ -80,7 +90,7 @@ function toFoodEntry(text: string | undefined, fallbackName: string): FoodEntry 
   try {
     const parsed = JSON.parse(text ?? "{}") as Partial<FoodEntry>;
     return {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      id: DateTimeService.id("food"),
       name: parsed.name ?? fallbackName,
       inputText: fallbackName,
       amount: parseFoodQuery(fallbackName).amount,
@@ -94,7 +104,7 @@ function toFoodEntry(text: string | undefined, fallbackName: string): FoodEntry 
       source: "text",
       amountLabel: parsed.amountLabel ?? parseFoodQuery(fallbackName).amountLabel,
       calculationMethod: "openai",
-      createdAt: new Date().toISOString()
+      createdAt: DateTimeService.nowIso()
     };
   } catch {
     return estimateFallback(fallbackName);

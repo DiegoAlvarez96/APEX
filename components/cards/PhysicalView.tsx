@@ -3,7 +3,9 @@
 import { Camera, Eye, Pencil, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui/Card";
+import { DateNavigator } from "@/components/ui/DateNavigator";
 import { InlineStatus, LoadingButton } from "@/components/ui/Loading";
+import { dateKey } from "@/lib/date";
 import type { BodyMeasurement } from "@/types/apex";
 
 type MeasurementForm = Omit<BodyMeasurement, "id" | "dateKey" | "createdAt">;
@@ -22,12 +24,16 @@ const fields = [
 
 export function PhysicalView({
   latest,
+  selectedDate,
+  onSelectDate,
   measurements,
   onSave,
   onUpdate,
   onDelete
 }: {
   latest?: BodyMeasurement;
+  selectedDate: Date;
+  onSelectDate: (date: Date) => void;
   measurements: BodyMeasurement[];
   onSave: (value: MeasurementForm) => Promise<void> | void;
   onUpdate: (id: number, value: Partial<BodyMeasurement>) => Promise<void> | void;
@@ -39,6 +45,8 @@ export function PhysicalView({
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number>();
   const [value, setValue] = useState<MeasurementForm>(emptyMeasurement(latest));
+  const selectedDateKey = dateKey(selectedDate);
+  const dayMeasurements = measurements.filter((measurement) => measurement.dateKey === selectedDateKey);
 
   useEffect(() => {
     if (!editing) setValue(emptyMeasurement(latest));
@@ -105,7 +113,7 @@ export function PhysicalView({
 
   return (
     <div className="space-y-5">
-      <header className="px-1 pt-2"><p className="text-sm text-white/45 light:text-black/45">Progreso corporal</p><h1 className="text-3xl font-semibold">Mi fisico</h1></header>
+      <DateNavigator title="Mi fisico" eyebrow="Progreso corporal" selectedDate={selectedDate} onSelectDate={onSelectDate} />
       <Card>
         <SectionTitle title={editing ? "Editar medicion" : "Medicion"} eyebrow="IA-ready" />
         <label className="mb-3 flex cursor-pointer items-center gap-3 rounded-3xl border border-dashed border-white/20 p-3 light:border-black/15">
@@ -142,29 +150,56 @@ export function PhysicalView({
 
       {selected ? <MeasurementDetail measurement={selected} /> : null}
 
+      {dayMeasurements.length ? (
+        <Card>
+          <SectionTitle title="Mediciones de este dia" eyebrow={selectedDateKey} />
+          <div className="space-y-2">
+            {dayMeasurements.map((measurement) => <MeasurementRow key={measurement.id} measurement={measurement} onSelect={setSelected} onEdit={load} onDelete={(item) => void remove(item)} deleting={deletingId === measurement.id} />)}
+          </div>
+        </Card>
+      ) : null}
+
       <Card>
-        <SectionTitle title="Historial" />
+        <SectionTitle title="Historial completo" />
         <div className="space-y-2">
           {measurements.map((measurement) => (
-            <div key={measurement.id} className="rounded-2xl bg-white/[0.06] p-3 text-sm light:bg-black/[0.04]">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold">{measurement.dateKey}</p>
-                  <p className="text-white/45 light:text-black/45">{measurement.weightKg} kg - cintura {measurement.waistCm ?? "-"} cm</p>
-                </div>
-                <div className="flex gap-2">
-                  <button className="grid size-9 place-items-center rounded-xl bg-white/[0.08]" onClick={() => setSelected(measurement)} type="button" aria-label="Ver detalle"><Eye size={15} /></button>
-                  <button className="grid size-9 place-items-center rounded-xl bg-white/[0.08]" onClick={() => load(measurement)} type="button" aria-label="Editar"><Pencil size={15} /></button>
-                  <LoadingButton loading={deletingId === measurement.id} loadingLabel="" className="grid size-9 place-items-center rounded-xl bg-red-500/15 text-red-200 light:text-red-700" onClick={() => void remove(measurement)}>
-                    <Trash2 size={15} />
-                  </LoadingButton>
-                </div>
-              </div>
-            </div>
+            <MeasurementRow key={measurement.id} measurement={measurement} onSelect={setSelected} onEdit={load} onDelete={(item) => void remove(item)} deleting={deletingId === measurement.id} />
           ))}
           {measurements.length === 0 ? <p className="text-sm text-white/45 light:text-black/45">Sin mediciones guardadas.</p> : null}
         </div>
       </Card>
+    </div>
+  );
+}
+
+function MeasurementRow({
+  measurement,
+  onSelect,
+  onEdit,
+  onDelete,
+  deleting
+}: {
+  measurement: BodyMeasurement;
+  onSelect: (measurement: BodyMeasurement) => void;
+  onEdit: (measurement: BodyMeasurement) => void;
+  onDelete: (measurement: BodyMeasurement) => void;
+  deleting: boolean;
+}) {
+  return (
+    <div className="rounded-2xl bg-white/[0.06] p-3 text-sm light:bg-black/[0.04]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{measurement.dateKey}</p>
+          <p className="text-white/45 light:text-black/45">{measurement.weightKg} kg - cintura {measurement.waistCm ?? "-"} cm</p>
+        </div>
+        <div className="flex gap-2">
+          <button className="grid size-9 place-items-center rounded-xl bg-white/[0.08]" onClick={() => onSelect(measurement)} type="button" aria-label="Ver detalle"><Eye size={15} /></button>
+          <button className="grid size-9 place-items-center rounded-xl bg-white/[0.08]" onClick={() => onEdit(measurement)} type="button" aria-label="Editar"><Pencil size={15} /></button>
+          <LoadingButton loading={deleting} loadingLabel="" className="grid size-9 place-items-center rounded-xl bg-red-500/15 text-red-200 light:text-red-700" onClick={() => onDelete(measurement)}>
+            <Trash2 size={15} />
+          </LoadingButton>
+        </div>
+      </div>
     </div>
   );
 }
