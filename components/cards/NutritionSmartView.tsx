@@ -142,6 +142,7 @@ export function NutritionSmartView({
         if (typeof reader.result !== "string") return;
         const response = await fetch("/api/ai/vision/food", {
           method: "POST",
+          cache: "no-store",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ image: reader.result })
         });

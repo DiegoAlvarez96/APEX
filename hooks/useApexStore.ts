@@ -302,6 +302,7 @@ export function useApexStore(selectedDate: Date) {
       setChatAiStatus("checking");
       const response = await fetch("/api/ai/chat", {
         method: "POST",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: content, context, history: chatMessages.slice(-16) })
       });
@@ -346,6 +347,7 @@ export function useApexStore(selectedDate: Date) {
     const key = text.trim().toLowerCase();
     const response = await fetch("/api/ai/food", {
       method: "POST",
+      cache: "no-store",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text })
     });
@@ -364,6 +366,7 @@ export function useApexStore(selectedDate: Date) {
   const generateNutritionPlan = useCallback(async (targetDateKey = selectedDateKey): Promise<NutritionPlanItem[]> => {
     const response = await fetch("/api/ai/nutrition-plan", {
       method: "POST",
+      cache: "no-store",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ targetDateKey, context: buildOpenAiContext() })
     });
@@ -375,6 +378,7 @@ export function useApexStore(selectedDate: Date) {
   const generateWorkoutPlan = useCallback(async (targetDateKey = selectedDateKey): Promise<Omit<Workout, "id">> => {
     const response = await fetch("/api/ai/training-plan", {
       method: "POST",
+      cache: "no-store",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ targetDateKey, context: buildOpenAiContext() })
     });

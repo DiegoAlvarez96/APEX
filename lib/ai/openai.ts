@@ -53,6 +53,7 @@ export class OpenAiInsightProvider implements ApexAiProvider {
   async analyze(context: ApexAiContext): Promise<ApexAiRecommendation[]> {
     const response = await fetch("/api/ai/insights", {
       method: "POST",
+      cache: "no-store",
       headers: {
         "Content-Type": "application/json"
       },

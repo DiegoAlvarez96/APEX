@@ -10,7 +10,7 @@ export type OpenAiRequestPayload = {
 };
 
 export class OpenAiServiceError extends Error {
-  code: "missing_api_key" | "quota" | "api_error" | "parse_error" | "empty_output";
+  code: "missing_api_key" | "quota" | "auth" | "api_error" | "parse_error" | "empty_output";
   status?: number;
   rawText?: string;
 
@@ -32,7 +32,7 @@ export async function requestOpenAiText({
   logPrefix: string;
   logPayload?: Record<string, unknown>;
 }) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = normalizeOpenAiApiKey(process.env.OPENAI_API_KEY);
   if (!apiKey) {
     logOpenAi(logPrefix, "error", { ...logPayload, code: "missing_api_key" });
     throw new OpenAiServiceError("missing_api_key", "Missing OPENAI_API_KEY");
@@ -90,13 +90,34 @@ export function stripJsonFence(value: string) {
   return value.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
 }
 
-export function detectOpenAiErrorCode(rawText: string): "quota" | "api_error" {
+export function normalizeOpenAiApiKey(value: string | undefined) {
+  const trimmed = value?.trim() ?? "";
+  return trimmed.replace(/^["']|["']$/g, "");
+}
+
+export function getOpenAiApiKeyDiagnostics(value: string | undefined) {
+  const raw = value ?? "";
+  const trimmed = raw.trim();
+  const normalized = normalizeOpenAiApiKey(value);
+  return {
+    configured: Boolean(trimmed),
+    hasOuterQuotes: /^["'].*["']$/.test(trimmed),
+    hasLeadingOrTrailingWhitespace: raw !== trimmed,
+    rawLength: raw.length,
+    normalizedLength: normalized.length,
+    prefix: normalized ? normalized.slice(0, 7) : null
+  };
+}
+
+export function detectOpenAiErrorCode(rawText: string): "quota" | "auth" | "api_error" {
   try {
     const parsed = JSON.parse(rawText) as { error?: { code?: string; type?: string; message?: string } };
     const haystack = `${parsed.error?.code ?? ""} ${parsed.error?.type ?? ""} ${parsed.error?.message ?? ""}`.toLowerCase();
     if (/quota|billing|credit|insufficient/.test(haystack)) return "quota";
+    if (/auth|api key|apikey|invalid.*key|incorrect.*key|unauthorized|401/.test(haystack)) return "auth";
   } catch {
     if (/quota|billing|credit|insufficient/i.test(rawText)) return "quota";
+    if (/auth|api key|apikey|invalid.*key|incorrect.*key|unauthorized|401/i.test(rawText)) return "auth";
   }
   return "api_error";
 }

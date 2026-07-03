@@ -73,6 +73,7 @@ export function ProductsSmartView({
       try {
         const response = await fetch("/api/ai/vision/product", {
           method: "POST",
+          cache: "no-store",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ image: reader.result })
         });
