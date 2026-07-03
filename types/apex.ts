@@ -122,14 +122,22 @@ export type FoodEntry = {
 
 export type NutritionPlanItem = {
   id: string;
-  meal: "Desayuno" | "Almuerzo" | "Merienda" | "Cena";
+  meal: "Desayuno" | "Colacion manana" | "Almuerzo" | "Merienda" | "Colacion tarde" | "Cena";
   name: string;
+  amountLabel?: string;
+  components?: NutritionPlanComponent[];
   done: boolean;
   calories?: number;
   protein?: number;
   carbs?: number;
   fat?: number;
   fiber?: number;
+  notes?: string;
+};
+
+export type NutritionPlanComponent = {
+  name: string;
+  amountLabel: string;
 };
 
 export type DrinkEntry = {

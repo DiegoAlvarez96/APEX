@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { DateTimeService } from "@/lib/date";
-import { estimatePhotoFoods } from "@/lib/nutrition";
+import { OpenAiServiceError, parseJsonFromOpenAi, requestOpenAiText } from "@/lib/ai/openaiService";
 import type { FoodEntry, FoodVisionOption, FoodVisionResult } from "@/types/apex";
 
 export const runtime = "nodejs";
@@ -24,13 +24,11 @@ export async function POST(request: Request) {
   const { image } = (await request.json()) as { image?: string };
   if (!image) return NextResponse.json({ error: "Missing image" }, { status: 400 });
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return NextResponse.json(lowConfidenceOptions());
-
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
+  try {
+    const { text } = await requestOpenAiText({
+      logPrefix: "nutrition-vision-openai",
+      logPayload: { imageBytes: image.length },
+      request: {
       model: "gpt-4.1-mini",
       input: [
         {
@@ -39,17 +37,20 @@ export async function POST(request: Request) {
         },
         { role: "user", content: [{ type: "input_text", text: FOOD_PHOTO_USER_PROMPT }, { type: "input_image", image_url: image }] }
       ]
-    })
-  });
-
-  if (!response.ok) return NextResponse.json(lowConfidenceOptions());
-  const data = await response.json();
-  return NextResponse.json(parseVisionResult(data.output_text));
+      }
+    });
+    return NextResponse.json(parseVisionResult(text));
+  } catch (error) {
+    if (error instanceof OpenAiServiceError && error.code === "quota") {
+      return NextResponse.json({ code: "quota", error: "Sin creditos en OpenAI. Revisa el saldo de la API." }, { status: 402 });
+    }
+    return NextResponse.json({ code: "api_error", error: "No se pudo obtener respuesta de OpenAI. Reintenta." }, { status: 502 });
+  }
 }
 
 function parseVisionResult(text: string | undefined): FoodVisionResult {
   try {
-    const parsed = JSON.parse(text ?? "{}") as { confidence?: number; options?: FoodVisionOption[]; foods?: Partial<FoodEntry>[] } | Partial<FoodEntry>[];
+    const parsed = parseJsonFromOpenAi<{ confidence?: number; options?: FoodVisionOption[]; foods?: Partial<FoodEntry>[] } | Partial<FoodEntry>[]>(text ?? "{}");
     if (Array.isArray(parsed)) return mapFoods(parsed);
     const confidence = Number(parsed.confidence ?? 0);
     const foods = mapFoods(parsed.foods ?? []);
@@ -100,11 +101,10 @@ function normalizeOptions(options: FoodVisionOption[] | undefined, foods: FoodEn
 }
 
 function lowConfidenceOptions(): FoodVisionResult {
-  const foods = estimatePhotoFoods().map((food) => ({ ...food, createdAt: DateTimeService.nowIso() }));
   return {
     status: "confirm",
     message: "Necesito confirmacion para evitar registrar un alimento incorrecto.",
     options: normalizeOptions(undefined, []),
-    foods
+    foods: []
   };
 }

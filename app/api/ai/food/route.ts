@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { DateTimeService } from "@/lib/date";
-import { findFoodPreset, parseFoodQuery, unknownFoodEntry } from "@/lib/nutrition";
+import { OpenAiServiceError, logOpenAi, requestOpenAiText } from "@/lib/ai/openaiService";
+import { parseFoodQuery, unknownFoodEntry } from "@/lib/nutrition";
 import type { FoodEntry } from "@/types/apex";
 
 export const runtime = "nodejs";
@@ -19,28 +20,7 @@ export async function POST(request: Request) {
   const query = text?.trim() ?? "";
   if (!query) return NextResponse.json({ error: "Missing food text" }, { status: 400 });
 
-  const preset = findFoodPreset(query);
   const parsedQuery = parseFoodQuery(query);
-  if (preset) {
-    return NextResponse.json({
-      id: DateTimeService.id("food"),
-      name: query,
-      inputText: query,
-      amount: parsedQuery.amount,
-      unit: parsedQuery.unit,
-      amountLabel: parsedQuery.amountLabel,
-      calories: preset.calories,
-      protein: preset.protein,
-      carbs: preset.carbs,
-      fat: preset.fat,
-      fiber: preset.fiber,
-      estimated: false,
-      source: "text",
-      calculationMethod: "database",
-      createdAt: DateTimeService.nowIso()
-    } satisfies FoodEntry);
-  }
-
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     logFoodAi("error", { query, code: "missing_api_key" });
@@ -54,6 +34,33 @@ export async function POST(request: Request) {
       { role: "user", content: JSON.stringify({ original: query, alimento: parsedQuery.name, cantidad: parsedQuery.amount, unidad: parsedQuery.unit }) }
     ]
   };
+
+  try {
+    const { text: outputText } = await requestOpenAiText({ request: openAiRequest, logPrefix: "nutrition-openai", logPayload: { query } });
+    const entry = toFoodEntry(outputText, query);
+    logOpenAi("nutrition-openai", "parsed_json", { query, outputText, entry });
+    logOpenAi("nutrition-openai", "source_final", { query, source: entry.source, calculationMethod: entry.calculationMethod });
+    return NextResponse.json(entry);
+  } catch (error) {
+    if (error instanceof OpenAiServiceError && error.code === "quota") {
+      return NextResponse.json({ code: "quota", error: "Sin crÃ©ditos en OpenAI. RevisÃ¡ el saldo de la API." }, { status: 402 });
+    }
+    if (error instanceof OpenAiServiceError && (error.code === "api_error" || error.code === "missing_api_key")) {
+      return NextResponse.json({ code: "api_error", error: "No se pudo obtener respuesta de OpenAI. ReintentÃ¡." }, { status: 502 });
+    }
+    const defaultEntry = estimateDefaultManual(query);
+    logOpenAi("nutrition-openai", "error", { query, code: "parse_error", message: error instanceof Error ? error.message : String(error), defaultEntry });
+    return NextResponse.json(
+      {
+        code: "parse_error",
+        error: "Error al parsear la respuesta de OpenAI.",
+        question: "Â¿QuerÃ©s cargar valores por defecto?",
+        defaultEntry
+      },
+      { status: 422 }
+    );
+  }
+
   logFoodAi("request", { query, request: openAiRequest });
 
   let response: Response;
@@ -64,7 +71,7 @@ export async function POST(request: Request) {
       body: JSON.stringify(openAiRequest)
     });
   } catch (error) {
-    logFoodAi("error", { query, code: "api_error", message: error instanceof Error ? error.message : String(error) });
+    logFoodAi("error", { query, code: "api_error", message: formatUnknownError(error) });
     return NextResponse.json({ code: "api_error", error: "No se pudo obtener respuesta de OpenAI. Reintentá." }, { status: 502 });
   }
 
@@ -88,7 +95,7 @@ export async function POST(request: Request) {
     return NextResponse.json(entry);
   } catch (error) {
     const defaultEntry = estimateDefaultManual(query);
-    logFoodAi("error", { query, code: "parse_error", message: error instanceof Error ? error.message : String(error), defaultEntry });
+    logFoodAi("error", { query, code: "parse_error", message: formatUnknownError(error), defaultEntry });
     return NextResponse.json(
       {
         code: "parse_error",
@@ -182,6 +189,10 @@ function numericField(parsed: FoodLike, keys: string[]) {
 
 function hasValidMacros(values: Pick<FoodEntry, "calories" | "protein" | "carbs" | "fat" | "fiber">) {
   return values.calories > 0 && values.protein >= 0 && values.carbs >= 0 && values.fat >= 0 && values.fiber >= 0 && values.protein + values.carbs + values.fat + values.fiber > 0;
+}
+
+function formatUnknownError(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function detectOpenAiErrorCode(rawText: string) {

@@ -20,7 +20,8 @@ export function TrainingSmartView({
   onDuplicateWorkout,
   templates,
   onAddTemplate,
-  onDeleteTemplate
+  onDeleteTemplate,
+  onGenerateWorkout
 }: {
   selectedDate: Date;
   selectedDateKey: string;
@@ -33,6 +34,7 @@ export function TrainingSmartView({
   templates: WorkoutTemplate[];
   onAddTemplate: (template: Omit<WorkoutTemplate, "id" | "createdAt" | "updatedAt">) => Promise<void> | void;
   onDeleteTemplate: (id: number) => Promise<void> | void;
+  onGenerateWorkout: (targetDateKey?: string) => Promise<Omit<Workout, "id">>;
 }) {
   const allTemplates = useMemo(() => [...templates, ...defaultWorkoutTemplates], [templates]);
   const assignedTemplate = useMemo(() => assignedWorkoutTemplateForDate(selectedDate, templates), [selectedDate, templates]);
@@ -42,7 +44,7 @@ export function TrainingSmartView({
   const [intensity, setIntensity] = useState<Workout["intensity"]>(assignedTemplate.intensity);
   const [notes, setNotes] = useState(assignedTemplate.notes ?? "");
   const [group, setGroup] = useState(assignedTemplate.group);
-  const [loading, setLoading] = useState<"workout" | "template" | "complete" | undefined>();
+  const [loading, setLoading] = useState<"workout" | "template" | "ai" | "complete" | undefined>();
   const [status, setStatus] = useState<{ message?: string; tone?: "info" | "success" | "error" }>({});
   const [rawExercises, setRawExercises] = useState(templateToRaw(assignedTemplate));
   const groups = Array.from(new Set(allTemplates.map((template) => template.group)));
@@ -106,6 +108,26 @@ export function TrainingSmartView({
     }
   }
 
+  async function generateWorkout() {
+    setLoading("ai");
+    setStatus({ message: "Generando entrenamiento con OpenAI...", tone: "info" });
+    try {
+      const workout = await onGenerateWorkout(selectedDateKey);
+      setEditing(undefined);
+      setTitle(workout.title);
+      setFocus(workout.focus);
+      setIntensity(workout.intensity);
+      setNotes(workout.notes ?? "");
+      setGroup(workout.title);
+      setRawExercises(workout.exercises.map(exerciseToRaw).join("\n"));
+      setStatus({ message: "Entrenamiento generado como plantilla editable.", tone: "success" });
+    } catch {
+      setStatus({ message: "No se pudo generar el entrenamiento con OpenAI.", tone: "error" });
+    } finally {
+      setLoading(undefined);
+    }
+  }
+
   async function saveTemplate() {
     const exercises = parseExercises(rawExercises);
     if (!title.trim() || exercises.length === 0) return;
@@ -148,7 +170,10 @@ export function TrainingSmartView({
       <DateNavigator title="Entrenamiento" eyebrow="Rutina del dia e historial" selectedDate={selectedDate} onSelectDate={onSelectDate} />
 
       <Card>
-        <SectionTitle title="Planificacion semanal" eyebrow="Agenda compartida" />
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <SectionTitle title="Planificacion semanal" eyebrow="Agenda compartida" />
+          <LoadingButton loading={loading === "ai"} loadingLabel="Generando..." className="min-h-10 rounded-2xl bg-white px-3 text-xs font-semibold text-black" onClick={() => void generateWorkout()}>Generar rutina</LoadingButton>
+        </div>
         <div className="rounded-2xl bg-limeglass/15 p-4 light:bg-black/[0.04]">
           <p className="text-sm text-white/55 light:text-black/55">Asignado para {selectedDateKey}</p>
           <p className="mt-1 text-xl font-semibold">{assignedTemplate.group} - {assignedTemplate.focus}</p>

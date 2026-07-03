@@ -21,7 +21,8 @@ export function NutritionSmartView({
   onSelectDate,
   onSave,
   onDelete,
-  onEstimateFood
+  onEstimateFood,
+  onGeneratePlan
 }: {
   nutrition?: NutritionLog;
   selectedDate: Date;
@@ -30,6 +31,7 @@ export function NutritionSmartView({
   onSave: (values: Omit<NutritionLog, "id" | "createdAt" | "updatedAt">) => Promise<void> | void;
   onDelete: (id: number) => void;
   onEstimateFood: (text: string) => Promise<FoodEntry>;
+  onGeneratePlan: (targetDateKey?: string) => Promise<NutritionPlanItem[]>;
 }) {
   const [mode, setMode] = useState<Mode>("text");
   const [text, setText] = useState("");
@@ -41,7 +43,7 @@ export function NutritionSmartView({
   const [drinkType, setDrinkType] = useState<DrinkType>("water");
   const [drinkAmount, setDrinkAmount] = useState(500);
   const [drinkUnit, setDrinkUnit] = useState<DrinkUnit>("ml");
-  const [loading, setLoading] = useState<"food" | "photo" | "autosave" | "delete" | undefined>();
+  const [loading, setLoading] = useState<"food" | "photo" | "plan" | "autosave" | "delete" | undefined>();
   const [status, setStatus] = useState<{ message?: string; tone?: "info" | "success" | "error" }>({});
   const [selectedFood, setSelectedFood] = useState<FoodEntry>();
   const [editingFood, setEditingFood] = useState<FoodEntry>();
@@ -87,13 +89,28 @@ export function NutritionSmartView({
     setStatus({ message: "Calculando calorias...", tone: "info" });
     const parsed = parseFoodText(text);
     try {
-      const enriched = await Promise.all(parsed.map((food) => (food.calories > 0 ? food : onEstimateFood(food.inputText ?? food.name))));
+      const enriched = await Promise.all(parsed.map((food) => onEstimateFood(food.inputText ?? food.name)));
       const nextMeals = [...meals, ...enriched];
       setMeals(nextMeals);
       setText("");
       await autosave(nextMeals);
     } catch (error) {
       handleFoodEstimateError(error, text);
+    } finally {
+      setLoading(undefined);
+    }
+  }
+
+  async function generatePlan() {
+    setLoading("plan");
+    setStatus({ message: "Generando plan con OpenAI...", tone: "info" });
+    try {
+      const nextPlan = await onGeneratePlan(selectedDateKey);
+      setPlanItems(nextPlan);
+      await autosave(meals, nextPlan, drinks);
+      setStatus({ message: "Plan generado para la fecha seleccionada.", tone: "success" });
+    } catch {
+      setStatus({ message: "No se pudo generar el plan nutricional con OpenAI.", tone: "error" });
     } finally {
       setLoading(undefined);
     }
@@ -256,20 +273,32 @@ export function NutritionSmartView({
       <DateNavigator title="Nutricion" eyebrow="Plan, comidas y bebidas" selectedDate={selectedDate} onSelectDate={onSelectDate} />
 
       <Card>
-        <SectionTitle title="Plan del dia" eyebrow="IA-ready" />
-        {(["Desayuno", "Almuerzo", "Merienda", "Cena"] as const).map((meal) => (
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <SectionTitle title="Plan del dia" eyebrow="OpenAI contextual" />
+          <LoadingButton loading={loading === "plan"} loadingLabel="Generando..." className="min-h-10 rounded-2xl bg-white px-3 text-xs font-semibold text-black" onClick={() => void generatePlan()}>Generar plan</LoadingButton>
+        </div>
+        {(["Desayuno", "Colacion manana", "Almuerzo", "Merienda", "Colacion tarde", "Cena"] as const).map((meal) => (
           <div key={meal} className="mb-4 last:mb-0">
             <p className="mb-2 text-sm font-semibold">{meal}</p>
             <div className="space-y-2">
               {planItems.filter((item) => item.meal === meal).map((item) => (
                 <button
                   key={item.id}
-                  className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-sm ${item.done ? "bg-limeglass text-black" : "bg-white/[0.06] light:bg-black/[0.04]"}`}
+                  className={`flex w-full items-start gap-3 rounded-2xl px-3 py-2 text-left text-sm ${item.done ? "bg-limeglass text-black" : "bg-white/[0.06] light:bg-black/[0.04]"}`}
                   onClick={() => void togglePlan(item.id)}
                   disabled={loading === "autosave"}
                   type="button"
                 >
-                  <Check size={16} /> {item.name}
+                  <Check className="mt-0.5 shrink-0" size={16} />
+                  <span className="min-w-0">
+                    <span className="block font-medium">{item.name}{item.amountLabel ? ` - ${item.amountLabel}` : ""}</span>
+                    {item.components?.length ? (
+                      <span className={`mt-1 block text-xs leading-5 ${item.done ? "text-black/65" : "text-white/45 light:text-black/45"}`}>
+                        {item.components.map((component) => `${component.name} ${component.amountLabel}`).join(" + ")}
+                      </span>
+                    ) : null}
+                    {item.notes ? <span className={`mt-1 block text-xs leading-5 ${item.done ? "text-black/55" : "text-white/40 light:text-black/40"}`}>{item.notes}</span> : null}
+                  </span>
                 </button>
               ))}
             </div>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { OpenAiServiceError, requestOpenAiText } from "@/lib/ai/openaiService";
 import { answerLocalChat } from "@/lib/chat";
 import type { ChatMessage } from "@/types/apex";
 
@@ -16,13 +17,6 @@ export async function POST(request: Request) {
   }
 
   const fallback = answerLocalChat(message, context);
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!apiKey) {
-    logChatAi("local_mode", { reason: "missing_api_key", message });
-    return NextResponse.json({ answer: fallback, mode: "local" });
-  }
-
   const openAiRequest = {
     model: "gpt-4.1-mini",
     input: [
@@ -37,62 +31,16 @@ export async function POST(request: Request) {
       }
     ]
   };
-  logChatAi("request", { message, historyCount: body.history?.length ?? 0, request: openAiRequest });
 
-  let response: Response;
   try {
-    response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(openAiRequest)
+    const { text: answer } = await requestOpenAiText({
+      request: openAiRequest,
+      logPrefix: "chat-openai",
+      logPayload: { message, historyCount: body.history?.length ?? 0 }
     });
-  } catch (error) {
-    logChatAi("error", { message, code: "network_error", error: error instanceof Error ? error.message : String(error) });
-    return NextResponse.json({ answer: fallback, mode: "local", error: "openai_network_error" });
-  }
-
-  const rawText = await response.text();
-  logChatAi("raw_response", { message, status: response.status, body: rawText });
-
-  if (!response.ok) {
-    logChatAi("error", { message, code: "openai_http_error", status: response.status, body: rawText });
-    return NextResponse.json({ answer: fallback, mode: "local", error: "openai_http_error" });
-  }
-
-  try {
-    const data = JSON.parse(rawText) as OpenAiResponse;
-    const answer = extractOpenAiText(data)?.trim();
-    if (!answer) {
-      logChatAi("error", { message, code: "empty_output" });
-      return NextResponse.json({ answer: fallback, mode: "local", error: "empty_output" });
-    }
-    logChatAi("parsed_answer", { message, answer });
     return NextResponse.json({ answer, mode: "openai" });
   } catch (error) {
-    logChatAi("error", { message, code: "parse_error", error: error instanceof Error ? error.message : String(error) });
-    return NextResponse.json({ answer: fallback, mode: "local", error: "parse_error" });
+    const code = error instanceof OpenAiServiceError ? error.code : "api_error";
+    return NextResponse.json({ answer: fallback, mode: "local", error: code });
   }
-}
-
-type OpenAiResponse = {
-  output_text?: string;
-  output?: { content?: { text?: string }[] }[];
-};
-
-function extractOpenAiText(data: OpenAiResponse) {
-  return data.output_text ?? data.output?.flatMap((item) => item.content ?? []).find((content) => typeof content.text === "string")?.text;
-}
-
-function logChatAi(event: string, payload: Record<string, unknown>) {
-  console.info(`[chat-openai:${event}]`, JSON.stringify(sanitizeForLog(payload)));
-}
-
-function sanitizeForLog(value: unknown): unknown {
-  if (typeof value === "string") return value.replace(/sk-[A-Za-z0-9_-]+/g, "sk-***").slice(0, 4000);
-  if (Array.isArray(value)) return value.map(sanitizeForLog);
-  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, sanitizeForLog(entry)]));
-  return value;
 }

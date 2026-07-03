@@ -10,7 +10,7 @@ import { calculateSleepDuration } from "@/lib/sleep";
 import { normalizeNutritionLog } from "@/lib/nutrition";
 import { getRoutineForDate } from "@/lib/routines";
 import { assignedWorkoutTemplateForDate } from "@/lib/trainingTemplates";
-import type { AgendaNote, ApexAlert, AppSettings, BodyMeasurement, ChatMessage, FoodEntry, NutritionLog, Product, ProductConsumption, ProgressPhoto, ShoppingItem, SleepLog, TaskCompletion, Workout, WorkoutTemplate } from "@/types/apex";
+import type { AgendaNote, ApexAlert, AppSettings, BodyMeasurement, ChatMessage, FoodEntry, NutritionLog, NutritionPlanItem, Product, ProductConsumption, ProgressPhoto, ShoppingItem, SleepLog, TaskCompletion, Workout, WorkoutTemplate } from "@/types/apex";
 
 const APEX_PROCESS_START_DATE_KEY = "2026-07-01";
 
@@ -31,6 +31,7 @@ export function useApexStore(selectedDate: Date) {
   const [sleepLogs, setSleepLogs] = useState<SleepLog[]>([]);
   const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(defaultSettings);
+  const [chatAiStatus, setChatAiStatus] = useState<"available" | "offline" | "checking">("offline");
   const [ready, setReady] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -258,59 +259,66 @@ export function useApexStore(selectedDate: Date) {
     await refresh();
   }, [refresh]);
 
-  const sendChatMessage = useCallback(async (content: string) => {
-    await db.chatMessages.add({ role: "user", content, createdAt: DateTimeService.nowIso() });
-    const context = {
-      process: buildApexProcessContext({
-        selectedDate,
-        selectedDateKey,
-        nutritionLogs,
-        productConsumptions,
-        workouts,
-        workoutTemplates,
-        bodyMeasurements,
-        sleepLogs,
-        shoppingItems,
-        alerts,
-        completions: allCompletions,
-        agendaNotes,
-        settings
-      }),
+  const buildOpenAiContext = useCallback(() => ({
+    process: buildApexProcessContext({
+      selectedDate,
       selectedDateKey,
-      nutritionToday: selectedNutrition,
       nutritionLogs,
-      stock: stockSummaries,
-      products,
       productConsumptions,
       workouts,
       workoutTemplates,
-      body: latestBody,
       bodyMeasurements,
-      sleep: selectedSleep,
       sleepLogs,
       shoppingItems,
       alerts,
       completions: allCompletions,
       agendaNotes,
       settings
-    };
+    }),
+    selectedDateKey,
+    nutritionToday: selectedNutrition,
+    nutritionLogs: recentByDate(nutritionLogs, 30),
+    stock: stockSummaries,
+    products,
+    productConsumptions: recentConsumptions(productConsumptions, 30),
+    workouts: recentByDate(workouts, 30),
+    workoutTemplates,
+    body: latestBody,
+    bodyMeasurements: recentBodyMeasurements(bodyMeasurements, 30),
+    sleep: selectedSleep,
+    sleepLogs: recentByDate(sleepLogs, 30),
+    shoppingItems,
+    alerts,
+    completions: recentByDate(allCompletions, 30),
+    agendaNotes: recentByDate(agendaNotes, 30),
+    settings
+  }), [agendaNotes, alerts, allCompletions, bodyMeasurements, latestBody, nutritionLogs, productConsumptions, products, selectedDate, selectedDateKey, selectedNutrition, selectedSleep, settings, shoppingItems, sleepLogs, stockSummaries, workoutTemplates, workouts]);
+
+  const sendChatMessage = useCallback(async (content: string) => {
+    await db.chatMessages.add({ role: "user", content, createdAt: DateTimeService.nowIso() });
+    const context = buildOpenAiContext();
     let answer = answerLocalChat(content, context);
     try {
+      setChatAiStatus("checking");
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: content, context, history: chatMessages.slice(-16) })
       });
       if (response.ok) {
-        const data = (await response.json()) as { answer?: string };
+        const data = (await response.json()) as { answer?: string; mode?: "openai" | "local" };
         answer = data.answer?.trim() || answer;
+        setChatAiStatus(data.mode === "openai" ? "available" : "offline");
+      } else {
+        setChatAiStatus("offline");
       }
     } catch {
+      setChatAiStatus("offline");
       answer = answerLocalChat(content, context);
     }
     await db.chatMessages.add({ role: "assistant", content: answer, createdAt: DateTimeService.nowIso() });
     await refresh();
-  }, [agendaNotes, alerts, allCompletions, bodyMeasurements, chatMessages, latestBody, nutritionLogs, productConsumptions, products, refresh, selectedDate, selectedDateKey, selectedNutrition, selectedSleep, settings, shoppingItems, sleepLogs, stockSummaries, workoutTemplates, workouts]);
+  }, [chatMessages, refresh, buildOpenAiContext]);
 
   const clearChat = useCallback(async () => {
     await db.chatMessages.clear();
@@ -336,9 +344,6 @@ export function useApexStore(selectedDate: Date) {
 
   const estimateFood = useCallback(async (text: string): Promise<FoodEntry> => {
     const key = text.trim().toLowerCase();
-    const cached = await db.foodCache.where("key").equals(key).first();
-    if (cached && hasValidFoodMacros(cached.entry)) return cached.entry;
-    if (cached?.id) await db.foodCache.delete(cached.id);
     const response = await fetch("/api/ai/food", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -351,9 +356,32 @@ export function useApexStore(selectedDate: Date) {
     }
     const entry = payload as FoodEntry;
     if (!hasValidFoodMacros(entry)) throw new FoodEstimateError("Error al parsear la respuesta de OpenAI.", "parse_error");
+    await db.foodCache.where("key").equals(key).delete();
     await db.foodCache.put({ key, entry, createdAt: DateTimeService.nowIso() });
     return entry;
   }, []);
+
+  const generateNutritionPlan = useCallback(async (targetDateKey = selectedDateKey): Promise<NutritionPlanItem[]> => {
+    const response = await fetch("/api/ai/nutrition-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetDateKey, context: buildOpenAiContext() })
+    });
+    const payload = (await response.json()) as { items?: NutritionPlanItem[]; error?: string };
+    if (!response.ok || !payload.items?.length) throw new Error(payload.error ?? "No se pudo generar el plan nutricional.");
+    return payload.items;
+  }, [buildOpenAiContext, selectedDateKey]);
+
+  const generateWorkoutPlan = useCallback(async (targetDateKey = selectedDateKey): Promise<Omit<Workout, "id">> => {
+    const response = await fetch("/api/ai/training-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetDateKey, context: buildOpenAiContext() })
+    });
+    const payload = (await response.json()) as Omit<Workout, "id"> & { error?: string };
+    if (!response.ok || !payload.exercises?.length) throw new Error(payload.error ?? "No se pudo generar el entrenamiento.");
+    return payload;
+  }, [buildOpenAiContext, selectedDateKey]);
 
   const addPhoto = useCallback(
     async (photo: Omit<ProgressPhoto, "id" | "createdAt">) => {
@@ -416,6 +444,7 @@ export function useApexStore(selectedDate: Date) {
     selectedSleep,
     photos,
     settings,
+    chatAiStatus,
     isDone,
     toggleTask,
     addProduct,
@@ -442,6 +471,8 @@ export function useApexStore(selectedDate: Date) {
     saveAgendaNote,
     saveSleepLog,
     estimateFood,
+    generateNutritionPlan,
+    generateWorkoutPlan,
     addPhoto,
     updateSettings,
     exportData,
@@ -518,9 +549,90 @@ function buildApexProcessContext(input: ApexProcessContextInput) {
       nutrition: input.settings.nutritionGoal ?? null,
       training: input.settings.trainingGoal ?? null
     },
+    recent30Days: buildRecentContext(input),
     pendingShopping: input.shoppingItems.filter((item) => item.status === "pending"),
     activeAlerts: input.alerts.filter((alert) => alert.status === "active" || alert.status === "buy")
   };
+}
+
+function buildRecentContext(input: ApexProcessContextInput) {
+  return {
+    physical: recentBodyMeasurements(input.bodyMeasurements, 30).map((item) => ({
+      dateKey: item.dateKey,
+      weightKg: item.weightKg,
+      heightCm: item.heightCm ?? null,
+      age: item.age ?? null,
+      goal: item.goal,
+      bodyFatPercent: item.bodyFatPercent ?? null,
+      measurements: {
+        chestCm: item.chestCm ?? null,
+        waistCm: item.waistCm ?? null,
+        armsCm: item.armsCm ?? null,
+        legsCm: item.legsCm ?? null,
+        neckCm: item.neckCm ?? null
+      },
+      notes: item.notes ?? null
+    })),
+    nutrition: recentByDate(input.nutritionLogs, 30).map((log) => ({
+      dateKey: log.dateKey,
+      calories: log.calories,
+      protein: log.protein,
+      carbs: log.carbs,
+      fat: log.fat,
+      fiber: log.fiber ?? 0,
+      waterMl: log.waterMl,
+      meals: (log.meals ?? []).map((meal) => ({
+        name: meal.name,
+        amountLabel: meal.amountLabel ?? meal.inputText ?? null,
+        calories: meal.calories,
+        protein: meal.protein,
+        carbs: meal.carbs,
+        fat: meal.fat,
+        fiber: meal.fiber
+      })),
+      plan: (log.planItems ?? []).map((item) => ({ meal: item.meal, name: item.name, amountLabel: item.amountLabel ?? null, components: item.components ?? [], done: item.done })),
+      drinks: (log.drinks ?? []).map((drink) => ({ type: drink.type, amountMl: drink.amountMl, label: drink.label }))
+    })),
+    training: recentByDate(input.workouts, 30).map((workout) => ({
+      dateKey: workout.dateKey,
+      title: workout.title,
+      focus: workout.focus,
+      intensity: workout.intensity,
+      durationMinutes: workout.durationMinutes ?? null,
+      completed: Boolean(workout.completed),
+      exercises: workout.exercises.map((exercise) => ({
+        name: exercise.name,
+        completed: Boolean(exercise.completed),
+        sets: exercise.sets.map((set) => ({
+          reps: set.reps,
+          weight: set.weight ?? null,
+          rir: set.rir ?? null,
+          restSeconds: set.restSeconds ?? null,
+          completed: Boolean(set.completed)
+        })),
+        notes: exercise.notes ?? null
+      })),
+      notes: workout.notes ?? null
+    })),
+    habits: {
+      sleep: recentByDate(input.sleepLogs, 30).map((sleep) => ({ dateKey: sleep.dateKey, sleepTime: sleep.sleepTime, wakeTime: sleep.wakeTime, durationMinutes: sleep.durationMinutes })),
+      completions: recentByDate(input.completions, 30).map((item) => ({ dateKey: item.dateKey, taskId: item.taskId, done: item.done })),
+      agendaNotes: recentByDate(input.agendaNotes, 30).map((note) => ({ dateKey: note.dateKey, note: note.note }))
+    }
+  };
+}
+
+function recentByDate<T extends { dateKey: string }>(items: T[], days: number) {
+  const minDateKey = dateKey(addDays(DateTimeService.todayDate(), -days));
+  return items.filter((item) => item.dateKey >= minDateKey).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+}
+
+function recentBodyMeasurements(items: BodyMeasurement[], days: number) {
+  return recentByDate(items, days);
+}
+
+function recentConsumptions(items: ProductConsumption[], days: number) {
+  return recentByDate(items, days);
 }
 
 function buildDailyContext(start: Date, end: Date, input: ApexProcessContextInput, todayKey: string) {

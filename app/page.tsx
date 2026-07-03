@@ -72,8 +72,8 @@ export default function Home() {
       />
     ),
     calendar: <CalendarView selectedDate={selectedDate} onSelectDate={setSelectedDate} mode={calendarMode} onModeChange={setCalendarMode} workouts={store.workouts} stockSummaries={store.stockSummaries} nutrition={store.selectedNutrition} bodyMeasurements={store.bodyMeasurements} workoutTemplates={store.workoutTemplates} previousSleep={previousSleep} note={store.selectedAgendaNote?.note} onSaveNote={(note) => void store.saveAgendaNote(note)} onOpenModule={(nextView) => navigate(nextView, { preserveDate: true })} isDone={store.isDone} onToggle={(id) => void store.toggleTask(id)} />,
-    nutrition: <NutritionSmartView nutrition={store.selectedNutrition} selectedDate={selectedDate} selectedDateKey={selectedDateKey} onSelectDate={setSelectedDate} onSave={store.upsertNutritionLog} onDelete={store.deleteNutritionLog} onEstimateFood={store.estimateFood} />,
-    training: <TrainingSmartView selectedDate={selectedDate} selectedDateKey={selectedDateKey} onSelectDate={setSelectedDate} workouts={store.selectedWorkouts} templates={store.workoutTemplates} onAddWorkout={store.addWorkout} onUpdateWorkout={store.updateWorkout} onDeleteWorkout={store.deleteWorkout} onDuplicateWorkout={store.duplicateWorkout} onAddTemplate={store.addWorkoutTemplate} onDeleteTemplate={store.deleteWorkoutTemplate} />,
+    nutrition: <NutritionSmartView nutrition={store.selectedNutrition} selectedDate={selectedDate} selectedDateKey={selectedDateKey} onSelectDate={setSelectedDate} onSave={store.upsertNutritionLog} onDelete={store.deleteNutritionLog} onEstimateFood={store.estimateFood} onGeneratePlan={store.generateNutritionPlan} />,
+    training: <TrainingSmartView selectedDate={selectedDate} selectedDateKey={selectedDateKey} onSelectDate={setSelectedDate} workouts={store.selectedWorkouts} templates={store.workoutTemplates} onAddWorkout={store.addWorkout} onUpdateWorkout={store.updateWorkout} onDeleteWorkout={store.deleteWorkout} onDuplicateWorkout={store.duplicateWorkout} onAddTemplate={store.addWorkoutTemplate} onDeleteTemplate={store.deleteWorkoutTemplate} onGenerateWorkout={store.generateWorkoutPlan} />,
     physical: <PhysicalView latest={store.latestBody} selectedDate={selectedDate} onSelectDate={setSelectedDate} measurements={store.bodyMeasurements} onSave={store.addBodyMeasurement} onUpdate={store.updateBodyMeasurement} onDelete={store.deleteBodyMeasurement} />,
     products: (
       <ProductsSmartView
@@ -87,7 +87,7 @@ export default function Home() {
     alerts: <AlertsView alerts={store.alerts} onSyncStockAlerts={() => void store.syncStockAlerts()} onUpdateStatus={(id, status) => void store.updateAlertStatus(id, status)} />,
     timeline: <TimelineView events={timeline} />,
     ai: <InsightsView settings={store.settings} nutrition={store.selectedNutrition} stock={store.stockSummaries} workouts={store.workouts} sleep={store.selectedSleep} habitsCompleted={habitsCompleted} />,
-    chat: <ChatAiView messages={store.chatMessages} onSend={store.sendChatMessage} onNewChat={store.clearChat} />,
+    chat: <ChatAiView messages={store.chatMessages} aiStatus={store.chatAiStatus} onSend={store.sendChatMessage} onNewChat={store.clearChat} />,
     stats: <StatsView completions={store.allCompletions} />,
     settings: <SettingsView settings={store.settings} onUpdateSettings={(settings) => void store.updateSettings(settings)} onExport={store.exportData} />,
     sleep: <SleepView sleep={store.selectedSleep} onSave={store.saveSleepLog} />

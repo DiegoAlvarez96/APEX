@@ -96,6 +96,7 @@ export function planItemToFood(item: NutritionPlanItem): FoodEntry {
   return {
     id: `plan-food-${item.id}`,
     name: item.name,
+    amountLabel: item.amountLabel,
     calories: item.calories ?? preset?.calories ?? 0,
     protein: item.protein ?? preset?.protein ?? 0,
     carbs: item.carbs ?? preset?.carbs ?? 0,
