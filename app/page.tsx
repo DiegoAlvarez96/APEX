@@ -57,6 +57,10 @@ export default function Home() {
     setSmartOpened(true);
   }, [smartOpened, store.ready, store.selectedSleep]);
 
+  useEffect(() => {
+    void logDeviceVisit();
+  }, []);
+
   const screen = {
     home: <HomeView onNavigate={navigate} />,
     dashboard: (
@@ -104,6 +108,40 @@ export default function Home() {
       <BottomNav active={view} onChange={navigate} />
     </main>
   );
+}
+
+async function logDeviceVisit() {
+  try {
+    await fetch("/api/device/log", {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: window.location.pathname,
+        referrer: document.referrer,
+        language: navigator.language,
+        languages: navigator.languages,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        platform: navigator.platform,
+        userAgent: navigator.userAgent,
+        screen: {
+          width: window.screen.width,
+          height: window.screen.height,
+          colorDepth: window.screen.colorDepth,
+          pixelDepth: window.screen.pixelDepth
+        },
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight
+        },
+        devicePixelRatio: window.devicePixelRatio,
+        touchPoints: navigator.maxTouchPoints,
+        standalone: window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
+      })
+    });
+  } catch {
+    // Device logging is best-effort and must never affect app usage.
+  }
 }
 
 function initialViewForNow(): ViewKey {
