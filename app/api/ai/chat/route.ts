@@ -4,6 +4,7 @@ import { answerLocalChat } from "@/lib/chat";
 import type { ChatMessage } from "@/types/apex";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type ChatContext = Record<string, unknown>;
 

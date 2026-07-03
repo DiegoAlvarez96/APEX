@@ -7,7 +7,7 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === "development",
   runtimeCaching: [
     {
-      urlPattern: /^https?.*/i,
+      urlPattern: /^https?:\/\/(?!.+\/api\/).*/i,
       handler: "NetworkFirst",
       options: {
         cacheName: "apex-http-cache",

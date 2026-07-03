@@ -4,6 +4,7 @@ import { OpenAiServiceError, logOpenAi, parseJsonFromOpenAi, requestOpenAiText }
 import type { NutritionPlanItem } from "@/types/apex";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const SYSTEM_PROMPT = [
   "Actua como nutricionista profesional para APEX.",

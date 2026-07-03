@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { parseJsonFromOpenAi, requestOpenAiText } from "@/lib/ai/openaiService";
 import { LocalInsightProvider, type ApexAiContext, type ApexAiRecommendation } from "@/lib/ai/openai";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const body = (await request.json()) as { context?: ApexAiContext; model?: string };
@@ -11,19 +13,10 @@ export async function POST(request: Request) {
     return NextResponse.json([], { status: 400 });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    const local = await new LocalInsightProvider().analyze(context);
-    return NextResponse.json(local);
-  }
-
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
+  try {
+    const { text } = await requestOpenAiText({
+      logPrefix: "insights-openai",
+      request: {
       model: body.model ?? "gpt-4.1-mini",
       input: [
         {
@@ -38,23 +31,19 @@ export async function POST(request: Request) {
           })
         }
       ]
-    })
-  });
-
-  if (!response.ok) {
+      }
+    });
+    const parsed = parseRecommendations(text);
+    return NextResponse.json(parsed);
+  } catch {
     const local = await new LocalInsightProvider().analyze(context);
     return NextResponse.json(local);
   }
-
-  const data = await response.json();
-  const text = typeof data.output_text === "string" ? data.output_text : "[]";
-  const parsed = parseRecommendations(text);
-  return NextResponse.json(parsed);
 }
 
 function parseRecommendations(value: string): ApexAiRecommendation[] {
   try {
-    const parsed = JSON.parse(value) as ApexAiRecommendation[];
+    const parsed = parseJsonFromOpenAi<ApexAiRecommendation[]>(value);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];

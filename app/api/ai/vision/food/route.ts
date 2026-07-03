@@ -4,6 +4,7 @@ import { OpenAiServiceError, parseJsonFromOpenAi, requestOpenAiText } from "@/li
 import type { FoodEntry, FoodVisionOption, FoodVisionResult } from "@/types/apex";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const FOOD_PHOTO_SYSTEM_PROMPT = [
   "Identifica alimentos y estima porciones visibles en la foto.",

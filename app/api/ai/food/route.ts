@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { DateTimeService } from "@/lib/date";
-import { OpenAiServiceError, logOpenAi, requestOpenAiText } from "@/lib/ai/openaiService";
+import { OpenAiServiceError, logOpenAi, parseJsonFromOpenAi, requestOpenAiText } from "@/lib/ai/openaiService";
 import { parseFoodQuery, unknownFoodEntry } from "@/lib/nutrition";
 import type { FoodEntry } from "@/types/apex";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const FOOD_TEXT_SYSTEM_PROMPT = [
   "Estima los macros del alimento indicado por el usuario usando la cantidad y unidad recibidas.",
@@ -21,12 +22,6 @@ export async function POST(request: Request) {
   if (!query) return NextResponse.json({ error: "Missing food text" }, { status: 400 });
 
   const parsedQuery = parseFoodQuery(query);
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    logFoodAi("error", { query, code: "missing_api_key" });
-    return NextResponse.json({ code: "api_error", error: "No se pudo obtener respuesta de OpenAI. Reintentá." }, { status: 503 });
-  }
-
   const openAiRequest = {
     model: "gpt-4.1-mini",
     input: [
@@ -43,10 +38,10 @@ export async function POST(request: Request) {
     return NextResponse.json(entry);
   } catch (error) {
     if (error instanceof OpenAiServiceError && error.code === "quota") {
-      return NextResponse.json({ code: "quota", error: "Sin crÃ©ditos en OpenAI. RevisÃ¡ el saldo de la API." }, { status: 402 });
+      return NextResponse.json({ code: "quota", error: "Sin creditos en OpenAI. Revisa el saldo de la API." }, { status: 402 });
     }
     if (error instanceof OpenAiServiceError && (error.code === "api_error" || error.code === "missing_api_key")) {
-      return NextResponse.json({ code: "api_error", error: "No se pudo obtener respuesta de OpenAI. ReintentÃ¡." }, { status: 502 });
+      return NextResponse.json({ code: "api_error", error: "No se pudo obtener respuesta de OpenAI. Reintenta." }, { status: 502 });
     }
     const defaultEntry = estimateDefaultManual(query);
     logOpenAi("nutrition-openai", "error", { query, code: "parse_error", message: error instanceof Error ? error.message : String(error), defaultEntry });
@@ -54,53 +49,7 @@ export async function POST(request: Request) {
       {
         code: "parse_error",
         error: "Error al parsear la respuesta de OpenAI.",
-        question: "Â¿QuerÃ©s cargar valores por defecto?",
-        defaultEntry
-      },
-      { status: 422 }
-    );
-  }
-
-  logFoodAi("request", { query, request: openAiRequest });
-
-  let response: Response;
-  try {
-    response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify(openAiRequest)
-    });
-  } catch (error) {
-    logFoodAi("error", { query, code: "api_error", message: formatUnknownError(error) });
-    return NextResponse.json({ code: "api_error", error: "No se pudo obtener respuesta de OpenAI. Reintentá." }, { status: 502 });
-  }
-
-  const rawText = await response.text();
-  logFoodAi("raw_response", { query, status: response.status, body: rawText });
-  if (!response.ok) {
-    const errorCode = detectOpenAiErrorCode(rawText);
-    logFoodAi("error", { query, status: response.status, code: errorCode });
-    if (errorCode === "quota") {
-      return NextResponse.json({ code: "quota", error: "Sin créditos en OpenAI. Revisá el saldo de la API." }, { status: 402 });
-    }
-    return NextResponse.json({ code: "api_error", error: "No se pudo obtener respuesta de OpenAI. Reintentá." }, { status: 502 });
-  }
-
-  try {
-    const data = JSON.parse(rawText) as OpenAiResponse;
-    const outputText = extractOpenAiText(data);
-    const entry = toFoodEntry(outputText, query);
-    logFoodAi("parsed_json", { query, outputText, entry });
-    logFoodAi("source_final", { query, source: entry.source, calculationMethod: entry.calculationMethod });
-    return NextResponse.json(entry);
-  } catch (error) {
-    const defaultEntry = estimateDefaultManual(query);
-    logFoodAi("error", { query, code: "parse_error", message: formatUnknownError(error), defaultEntry });
-    return NextResponse.json(
-      {
-        code: "parse_error",
-        error: "Error al parsear la respuesta de OpenAI.",
-        question: "¿Querés cargar valores por defecto?",
+        question: "Queres cargar valores por defecto?",
         defaultEntry
       },
       { status: 422 }
@@ -136,7 +85,7 @@ function estimateDefaultManual(query: string): FoodEntry {
 
 function toFoodEntry(text: string | undefined, fallbackName: string): FoodEntry {
   if (!text) throw new Error("OpenAI response text is empty");
-  const parsed = JSON.parse(stripJsonFence(text)) as FoodLike;
+  const parsed = parseJsonFromOpenAi<FoodLike>(text);
   const calories = numericField(parsed, ["calories", "kcal", "calorias"]);
   const protein = numericField(parsed, ["protein", "proteins", "proteina", "proteinas"]);
   const carbs = numericField(parsed, ["carbs", "carbohydrates", "carbohidratos", "hidratos"]);
@@ -163,20 +112,7 @@ function toFoodEntry(text: string | undefined, fallbackName: string): FoodEntry 
   };
 }
 
-type OpenAiResponse = {
-  output_text?: string;
-  output?: { content?: { text?: string }[] }[];
-};
-
 type FoodLike = Record<string, unknown>;
-
-function extractOpenAiText(data: OpenAiResponse) {
-  return data.output_text ?? data.output?.flatMap((item) => item.content ?? []).find((content) => typeof content.text === "string")?.text;
-}
-
-function stripJsonFence(value: string) {
-  return value.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
-}
 
 function numericField(parsed: FoodLike, keys: string[]) {
   for (const key of keys) {
@@ -189,30 +125,4 @@ function numericField(parsed: FoodLike, keys: string[]) {
 
 function hasValidMacros(values: Pick<FoodEntry, "calories" | "protein" | "carbs" | "fat" | "fiber">) {
   return values.calories > 0 && values.protein >= 0 && values.carbs >= 0 && values.fat >= 0 && values.fiber >= 0 && values.protein + values.carbs + values.fat + values.fiber > 0;
-}
-
-function formatUnknownError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function detectOpenAiErrorCode(rawText: string) {
-  try {
-    const parsed = JSON.parse(rawText) as { error?: { code?: string; type?: string; message?: string } };
-    const haystack = `${parsed.error?.code ?? ""} ${parsed.error?.type ?? ""} ${parsed.error?.message ?? ""}`.toLowerCase();
-    if (/quota|billing|credit|insufficient/.test(haystack)) return "quota";
-  } catch {
-    if (/quota|billing|credit|insufficient/i.test(rawText)) return "quota";
-  }
-  return "api_error";
-}
-
-function logFoodAi(event: string, payload: Record<string, unknown>) {
-  console.info(`[nutrition-openai:${event}]`, JSON.stringify(sanitizeForLog(payload)));
-}
-
-function sanitizeForLog(value: unknown): unknown {
-  if (typeof value === "string") return value.replace(/sk-[A-Za-z0-9_-]+/g, "sk-***").slice(0, 4000);
-  if (Array.isArray(value)) return value.map(sanitizeForLog);
-  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, sanitizeForLog(entry)]));
-  return value;
 }

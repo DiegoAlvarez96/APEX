@@ -4,6 +4,7 @@ import { OpenAiServiceError, logOpenAi, parseJsonFromOpenAi, requestOpenAiText }
 import type { Workout, WorkoutExercise } from "@/types/apex";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const SYSTEM_PROMPT = [
   "Actua como entrenador y preparador fisico profesional para APEX.",
