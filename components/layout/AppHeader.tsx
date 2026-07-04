@@ -39,10 +39,10 @@ export function AppHeader({ onNavigate, onRefresh }: { onNavigate: (view: ViewKe
   }
 
   return (
-    <div className="sticky top-0 z-40 -mx-4 mb-2 flex items-center justify-between gap-2 bg-[rgb(var(--bg))]/78 px-4 py-2 backdrop-blur-xl">
-      <button type="button" onClick={() => onNavigate("home")} className="min-h-11 rounded-full px-1 text-left" aria-label="Ir al inicio">
-        <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[rgb(var(--muted))]">APEX</span>
-        <span className="block text-base font-semibold leading-5">Hoy</span>
+    <div className="sticky top-0 z-40 -mx-4 mb-1 flex items-center justify-between gap-2 bg-[rgb(var(--bg))]/78 px-4 py-1.5 backdrop-blur-xl">
+      <button type="button" onClick={() => onNavigate("home")} className="min-h-9 rounded-full px-1 text-left" aria-label="Ir al inicio">
+        <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--muted))]">APEX</span>
+        <span className="block text-sm font-semibold leading-4">Hoy</span>
       </button>
       {updateState !== "idle" ? (
         <span className="flex items-center gap-2 rounded-full bg-[rgb(var(--surface))] px-3 py-2 text-xs text-[rgb(var(--muted))]">
@@ -51,10 +51,10 @@ export function AppHeader({ onNavigate, onRefresh }: { onNavigate: (view: ViewKe
         </span>
       ) : null}
       <div className="flex gap-2">
-        <button className="grid size-10 place-items-center rounded-full bg-[rgb(var(--surface))] text-[rgb(var(--text))]" onClick={() => onNavigate("alerts")} aria-label="Alertas" type="button"><Bell size={18} /></button>
-        <button className="grid size-10 place-items-center rounded-full bg-[rgb(var(--surface))] text-[rgb(var(--text))] disabled:opacity-60" onClick={() => void updateApp()} disabled={updateState === "checking"} aria-label="Actualizar aplicacion" type="button"><RefreshCw size={18} /></button>
-        <button className="grid size-10 place-items-center rounded-full bg-[rgb(var(--surface))] text-[rgb(var(--text))]" onClick={() => onNavigate("chat")} aria-label="Chat IA" type="button"><Bot size={18} /></button>
-        <button className="grid size-10 place-items-center rounded-full bg-[rgb(var(--surface))] text-[rgb(var(--text))]" onClick={() => onNavigate("settings")} aria-label="Configuracion" type="button"><Settings size={18} /></button>
+        <button className="grid size-8 place-items-center rounded-full bg-[rgb(var(--surface))] text-[rgb(var(--text))]" onClick={() => onNavigate("alerts")} aria-label="Alertas" type="button"><Bell size={15} /></button>
+        <button className="grid size-8 place-items-center rounded-full bg-[rgb(var(--surface))] text-[rgb(var(--text))] disabled:opacity-60" onClick={() => void updateApp()} disabled={updateState === "checking"} aria-label="Actualizar aplicacion" type="button"><RefreshCw size={15} /></button>
+        <button className="grid size-8 place-items-center rounded-full bg-[rgb(var(--surface))] text-[rgb(var(--text))]" onClick={() => onNavigate("chat")} aria-label="Chat IA" type="button"><Bot size={15} /></button>
+        <button className="grid size-8 place-items-center rounded-full bg-[rgb(var(--surface))] text-[rgb(var(--text))]" onClick={() => onNavigate("settings")} aria-label="Configuracion" type="button"><Settings size={15} /></button>
       </div>
     </div>
   );

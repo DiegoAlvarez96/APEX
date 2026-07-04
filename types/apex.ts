@@ -6,6 +6,10 @@ export type AlertSeverity = "info" | "warning" | "critical";
 export type ProductGroup = "nutrition" | "personalCare" | "supplement" | "other";
 export type ShoppingStatus = "pending" | "bought" | "ignored";
 export type DrinkType = "water" | "soda" | "juice" | "isotonic" | "alcohol" | "other";
+export type FinanceTransactionType = "expense" | "income";
+export type FinanceCurrency = "ARS" | "USD" | "EUR" | "BRL" | "CLP" | "UYU" | "MXN" | "COP" | "PEN" | "GBP";
+export type FinancePaymentKind = "cash" | "transfer" | "debit" | "credit" | "wallet" | "app";
+export type FinanceRangeMode = "day" | "week" | "month" | "custom";
 
 export type RoutineTask = {
   id: string;
@@ -251,6 +255,82 @@ export type SleepLog = {
   sleepTime: string;
   wakeTime: string;
   durationMinutes: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FinanceTransaction = {
+  id?: number;
+  type: FinanceTransactionType;
+  description: string;
+  amount: number;
+  currency: FinanceCurrency;
+  category: string;
+  incomeSource?: string;
+  dateKey: string;
+  occurredAt: string;
+  paymentMethodId?: number;
+  paymentMethodLabel?: string;
+  paymentKind?: FinancePaymentKind;
+  installments?: {
+    count: number;
+    firstDueDateKey: string;
+    amountPerInstallment: number;
+  };
+  reimbursement?: {
+    mode: "amount" | "percent";
+    value: number;
+    discountAmount: number;
+    netAmount: number;
+  };
+  extraInfo?: string;
+  cardStatementDateKey?: string;
+  cardPaymentDateKey?: string;
+  source: "quick" | "manual" | "import" | "ai";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FinanceCategoryRule = {
+  id?: number;
+  key: string;
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FinancePaymentMethod = {
+  id?: number;
+  label: string;
+  kind: FinancePaymentKind;
+  issuer?: string;
+  network?: string;
+  closingDay?: number;
+  closingBusinessDaysBeforeMonthEnd?: number;
+  paymentDay?: number;
+  paymentBusinessDayFromMonthStart?: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FinanceScheduledPayment = {
+  id?: number;
+  transactionId?: number;
+  title: string;
+  amount: number;
+  currency: FinanceCurrency;
+  dueDateKey: string;
+  extraInfo?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FinanceSettings = {
+  id: "finance";
+  defaultPaymentMethodId?: number;
+  monthRangeStartDay: number;
+  monthRangeEndDay: number;
+  incomeSources: string[];
   createdAt: string;
   updatedAt: string;
 };

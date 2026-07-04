@@ -40,7 +40,7 @@ export function Dashboard({
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
-      <DateNavigator title="Skincare" eyebrow="Rutina y habitos del dia" selectedDate={selectedDate} onSelectDate={onSelectDate} />
+      <DateNavigator title="Tareas" eyebrow="Rutina y tareas del dia" selectedDate={selectedDate} onSelectDate={onSelectDate} />
 
       <Card className="flex items-center justify-between gap-5">
         <div>
@@ -55,7 +55,7 @@ export function Dashboard({
 
       {(["morning", "afternoon", "night"] as const).map((slot) => (
         <Card key={slot}>
-          <SectionTitle eyebrow={slot === currentSlot ? "Ahora" : undefined} title={slotLabel(slot)} />
+          <SectionTitle eyebrow={slot === currentSlot ? "Rutina actual" : "Rutina"} title={slotLabel(slot)} />
           <TaskList tasks={routine.tasks.filter((task) => task.slot === slot)} isDone={isDone} onToggle={onToggle} />
         </Card>
       ))}

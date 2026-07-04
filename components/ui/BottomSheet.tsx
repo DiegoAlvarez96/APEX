@@ -27,21 +27,21 @@ export function BottomSheet({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 32, stiffness: 360 }}
-            className="absolute inset-x-0 bottom-0 mx-auto max-h-[86dvh] max-w-xl overflow-hidden rounded-t-[30px] border border-[rgb(var(--border))] bg-[rgb(var(--surface-strong))] shadow-panel"
+            className="absolute inset-x-0 bottom-0 mx-auto max-h-[78dvh] max-w-xl overflow-hidden rounded-t-[24px] border border-[rgb(var(--border))] bg-[rgb(var(--surface-strong))] shadow-panel"
             role="dialog"
             aria-modal="true"
           >
-            <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-[rgb(var(--border))]" />
-            <header className="flex items-center justify-between gap-3 px-5 py-4">
+            <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-[rgb(var(--border))]" />
+            <header className="flex items-center justify-between gap-3 px-4 py-3">
               <div className="min-w-0">
-                {eyebrow ? <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[rgb(var(--muted))]">{eyebrow}</p> : null}
-                <h2 className="truncate text-xl font-semibold">{title}</h2>
+                {eyebrow ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--muted))]">{eyebrow}</p> : null}
+                <h2 className="truncate text-base font-semibold">{title}</h2>
               </div>
-              <button type="button" className="grid size-10 shrink-0 place-items-center rounded-full bg-[rgb(var(--surface))]" onClick={onClose} aria-label="Cerrar">
-                <X size={18} />
+              <button type="button" className="grid size-8 shrink-0 place-items-center rounded-full bg-[rgb(var(--surface))]" onClick={onClose} aria-label="Cerrar">
+                <X size={14} />
               </button>
             </header>
-            <div className="max-h-[calc(86dvh-92px)] overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+24px)]">{children}</div>
+            <div className="max-h-[calc(78dvh-72px)] overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+18px)]">{children}</div>
           </motion.section>
         </motion.div>
       ) : null}

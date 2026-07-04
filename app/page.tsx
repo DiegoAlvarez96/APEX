@@ -6,6 +6,7 @@ import { Dashboard } from "@/components/cards/Dashboard";
 import { AlertsView } from "@/components/cards/AlertsView";
 import { CalendarView } from "@/components/cards/CalendarView";
 import { ChatAiView } from "@/components/cards/ChatAiView";
+import { FinanceView } from "@/components/cards/FinanceView";
 import { HomeView } from "@/components/cards/HomeView";
 import { InsightsView } from "@/components/cards/InsightsView";
 import { NutritionSmartView } from "@/components/cards/NutritionSmartView";
@@ -63,6 +64,7 @@ export default function Home() {
 
   const screen = {
     home: <HomeView onNavigate={navigate} />,
+    finance: <FinanceView selectedDateKey={selectedDateKey} transactions={store.financeTransactions} rules={store.financeCategoryRules} paymentMethods={store.financePaymentMethods} scheduledPayments={store.financeScheduledPayments} settings={store.financeSettings} onSave={store.addFinanceTransaction} onDelete={store.deleteFinanceTransaction} onAddPaymentMethod={store.addFinancePaymentMethod} onUpdateSettings={store.updateFinanceSettings} />,
     dashboard: (
       <Dashboard
         selectedDate={selectedDate}
@@ -75,7 +77,7 @@ export default function Home() {
         sleep={store.selectedSleep}
       />
     ),
-    calendar: <CalendarView selectedDate={selectedDate} onSelectDate={setSelectedDate} mode={calendarMode} onModeChange={setCalendarMode} workouts={store.workouts} stockSummaries={store.stockSummaries} nutrition={store.selectedNutrition} bodyMeasurements={store.bodyMeasurements} workoutTemplates={store.workoutTemplates} previousSleep={previousSleep} note={store.selectedAgendaNote?.note} onSaveNote={(note) => void store.saveAgendaNote(note)} onOpenModule={(nextView) => navigate(nextView, { preserveDate: true })} isDone={store.isDone} onToggle={(id) => void store.toggleTask(id)} />,
+    calendar: <CalendarView selectedDate={selectedDate} onSelectDate={setSelectedDate} mode={calendarMode} onModeChange={setCalendarMode} workouts={store.workouts} stockSummaries={store.stockSummaries} nutrition={store.selectedNutrition} bodyMeasurements={store.bodyMeasurements} workoutTemplates={store.workoutTemplates} financeScheduledPayments={store.financeScheduledPayments} previousSleep={previousSleep} note={store.selectedAgendaNote?.note} onSaveNote={(note) => void store.saveAgendaNote(note)} onOpenModule={(nextView) => navigate(nextView, { preserveDate: true })} isDone={store.isDone} onToggle={(id) => void store.toggleTask(id)} />,
     nutrition: <NutritionSmartView nutrition={store.selectedNutrition} selectedDate={selectedDate} selectedDateKey={selectedDateKey} onSelectDate={setSelectedDate} onSave={store.upsertNutritionLog} onDelete={store.deleteNutritionLog} onEstimateFood={store.estimateFood} onGeneratePlan={store.generateNutritionPlan} />,
     training: <TrainingSmartView selectedDate={selectedDate} selectedDateKey={selectedDateKey} onSelectDate={setSelectedDate} workouts={store.selectedWorkouts} templates={store.workoutTemplates} onAddWorkout={store.addWorkout} onUpdateWorkout={store.updateWorkout} onDeleteWorkout={store.deleteWorkout} onDuplicateWorkout={store.duplicateWorkout} onAddTemplate={store.addWorkoutTemplate} onDeleteTemplate={store.deleteWorkoutTemplate} onGenerateWorkout={store.generateWorkoutPlan} />,
     physical: <PhysicalView latest={store.latestBody} selectedDate={selectedDate} onSelectDate={setSelectedDate} measurements={store.bodyMeasurements} onSave={store.addBodyMeasurement} onUpdate={store.updateBodyMeasurement} onDelete={store.deleteBodyMeasurement} />,
@@ -98,7 +100,7 @@ export default function Home() {
   }[view];
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-xl px-4 pb-28 pt-[calc(env(safe-area-inset-top)+18px)] lg:max-w-3xl">
+    <main className="mx-auto min-h-dvh w-full max-w-xl px-3 pb-20 pt-[calc(env(safe-area-inset-top)+10px)] lg:max-w-3xl">
       <AppHeader onNavigate={navigate} onRefresh={store.refresh} />
       <AnimatePresence mode="wait">
         <motion.div key={view} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>

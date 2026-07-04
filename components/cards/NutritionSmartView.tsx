@@ -2,7 +2,7 @@
 
 import { Camera, Check, Copy, Eye, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Card, SectionTitle } from "@/components/ui/Card";
+import { CompactDisclosure } from "@/components/ui/CompactDisclosure";
 import { DateNavigator } from "@/components/ui/DateNavigator";
 import { InlineStatus, LoadingButton } from "@/components/ui/Loading";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
@@ -52,6 +52,7 @@ export function NutritionSmartView({
   const totals = useMemo(() => calculateNutritionTotals(meals, planItems, drinks), [drinks, meals, planItems]);
   const waterMl = drinks.filter((drink) => drink.type === "water").reduce((sum, drink) => sum + drink.amountMl, 0);
   const suggestions = suggestFoods(query);
+  const frequentFoods = useMemo(() => buildFrequentFoods(meals, text), [meals, text]);
 
   useEffect(() => {
     setWeightKg(nutrition?.weightKg ?? 0);
@@ -273,9 +274,8 @@ export function NutritionSmartView({
     <div className="space-y-5">
       <DateNavigator title="Nutricion" eyebrow="Plan, comidas y bebidas" selectedDate={selectedDate} onSelectDate={onSelectDate} />
 
-      <Card>
+      <CompactDisclosure title="Plan del dia" eyebrow="OpenAI contextual">
         <div className="mb-4 flex items-start justify-between gap-3">
-          <SectionTitle title="Plan del dia" eyebrow="OpenAI contextual" />
           <LoadingButton loading={loading === "plan"} loadingLabel="Generando..." className="min-h-10 rounded-2xl bg-white px-3 text-xs font-semibold text-black" onClick={() => void generatePlan()}>Generar plan</LoadingButton>
         </div>
         {(["Desayuno", "Colacion manana", "Almuerzo", "Merienda", "Colacion tarde", "Cena"] as const).map((meal) => (
@@ -305,16 +305,27 @@ export function NutritionSmartView({
             </div>
           </div>
         ))}
-      </Card>
+      </CompactDisclosure>
 
-      <SegmentedControl value={mode} onChange={setMode} options={[{ value: "text", label: "Extra" }, { value: "search", label: "Buscar" }, { value: "photo", label: "Foto" }]} />
-
-      <Card>
-        <SectionTitle title="Agregar comidas fuera del plan" eyebrow="Autoguardado" />
+      <CompactDisclosure title="Agregar comidas" defaultOpen>
+        <div className="-mx-1 -mt-1 mb-2">
+          <SegmentedControl value={mode} onChange={setMode} options={[{ value: "text", label: "Nuevo" }, { value: "search", label: "Buscar" }, { value: "photo", label: "Foto" }]} />
+        </div>
         {mode === "text" ? (
-          <div className="grid gap-3">
-            <textarea className="min-h-28 rounded-3xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" placeholder="150 gramos de milanesa de pollo&#10;Cafe&#10;Alfajor" value={text} onChange={(event) => setText(event.target.value)} />
-            <LoadingButton loading={loading === "food"} loadingLabel="Calculando..." className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-white text-black" onClick={() => void addTextFoods()}><Plus size={18} /> Agregar y estimar</LoadingButton>
+          <div className="grid gap-2">
+            <div className="flex items-center gap-2 rounded-xl bg-white/[0.08] px-3 py-2 light:bg-black/[0.05]">
+              <Search size={14} />
+              <input className="w-full bg-transparent text-sm outline-none" placeholder="Buscar o escribir alimento..." value={text} onChange={(event) => setText(event.target.value)} />
+            </div>
+            <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
+              {frequentFoods.map((food) => (
+                <button key={food} type="button" className="shrink-0 rounded-full bg-[rgb(var(--nutrition))]/16 px-3 py-1.5 text-xs font-semibold text-[rgb(var(--nutrition))]" onClick={() => void addFood(food)}>
+                  {food}
+                </button>
+              ))}
+            </div>
+            <textarea className="min-h-20 rounded-xl bg-white/[0.08] px-3 py-2 text-sm outline-none light:bg-black/[0.05]" placeholder="Detalle opcional: 150 gramos de pollo, cafe, alfajor..." value={text} onChange={(event) => setText(event.target.value)} />
+            <LoadingButton loading={loading === "food"} loadingLabel="Calculando..." className="flex h-10 items-center justify-center gap-2 rounded-xl bg-[rgb(var(--nutrition))] font-semibold text-black" onClick={() => void addTextFoods()}><Plus size={15} /> Agregar</LoadingButton>
           </div>
         ) : null}
         {mode === "search" ? (
@@ -330,10 +341,9 @@ export function NutritionSmartView({
             <input className="hidden" type="file" accept="image/*" capture="environment" onChange={(event) => void handlePhoto(event.target.files?.[0] ?? null)} />
           </label>
         ) : null}
-      </Card>
+      </CompactDisclosure>
 
-      <Card>
-        <SectionTitle title="Bebidas" />
+      <CompactDisclosure title="Bebidas" eyebrow={`${(waterMl / 1000).toFixed(1)} L agua`}>
         <div className="grid grid-cols-[1fr_1fr_0.8fr_auto] gap-2">
           <select className="rounded-2xl bg-white/[0.08] px-3 py-2 outline-none light:bg-black/[0.05]" value={drinkType} onChange={(event) => setDrinkType(event.target.value as DrinkType)}>
             <option value="water">Agua</option>
@@ -362,12 +372,11 @@ export function NutritionSmartView({
             </div>
           ))}
         </div>
-      </Card>
+      </CompactDisclosure>
 
       <InlineStatus message={loading === "autosave" ? "Guardando..." : status.message} tone={loading === "autosave" ? "info" : status.tone} />
 
-      <Card>
-        <SectionTitle title="Historial de comidas del dia" />
+      <CompactDisclosure title="Historial de comidas" eyebrow={`${meals.length} registros`}>
         <div className="mb-3 grid grid-cols-2 gap-2">
           <label className="rounded-2xl bg-white/[0.08] px-3 py-2 text-sm light:bg-black/[0.05]">
             <span className="text-xs text-white/45 light:text-black/45">Peso</span>
@@ -392,10 +401,9 @@ export function NutritionSmartView({
           {meals.length === 0 ? <p className="text-sm text-white/45 light:text-black/45">Sin comidas extra registradas para este dia.</p> : null}
         </div>
         {selectedFood ? <FoodDetail food={selectedFood} editing={editingFood?.id === selectedFood.id} onEdit={() => setEditingFood(selectedFood)} onCancel={() => setEditingFood(undefined)} onChange={setEditingFood} draft={editingFood ?? selectedFood} onSave={(food) => void updateFood(food)} /> : null}
-      </Card>
+      </CompactDisclosure>
 
-      <Card>
-        <SectionTitle title="Dashboard del dia" />
+      <CompactDisclosure title="Dashboard del dia" eyebrow={`${Math.round(totals.calories)} kcal`}>
         <div className="grid grid-cols-2 gap-3">
           <Metric label="Calorias" detail="Plan completado, extras y bebidas." value={`${Math.round(totals.calories)} kcal`} />
           <Metric label="Proteinas" detail="Proteina total del dia." value={`${Math.round(totals.protein)} g`} />
@@ -404,7 +412,7 @@ export function NutritionSmartView({
           <Metric label="Fibra" detail="Fibra estimada total." value={`${Math.round(totals.fiber ?? 0)} g`} />
           <Metric label="Agua" detail="Agua registrada y convertida a ml." value={`${(waterMl / 1000).toFixed(1)} L`} />
         </div>
-      </Card>
+      </CompactDisclosure>
 
       {visionConfirm ? (
         <div className="fixed inset-0 z-[70] grid place-items-end bg-black/60 p-4 sm:place-items-center">
@@ -509,4 +517,17 @@ function FoodDetail({
 
 function Metric({ label, detail, value }: { label: string; detail: string; value: string }) {
   return <div className="rounded-2xl bg-white/[0.06] p-3 light:bg-black/[0.04]"><p className="text-xs text-white/45 light:text-black/45">{label}</p><p className="text-lg font-semibold">{value}</p><p className="mt-1 text-[11px] leading-4 text-white/40 light:text-black/40">{detail}</p></div>;
+}
+
+function buildFrequentFoods(meals: FoodEntry[], query: string) {
+  const fallback = ["Proteina Whey", "Banana", "Avena", "Creatina", "Pollo", "Arroz", "Yogur", "Huevos", "Agua"];
+  const counts = new Map<string, number>();
+  for (const meal of meals) counts.set(meal.name, (counts.get(meal.name) ?? 0) + 1);
+  for (const food of fallback) counts.set(food, counts.get(food) ?? 0);
+  const normalized = query.trim().toLowerCase();
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name]) => name)
+    .filter((name) => !normalized || name.toLowerCase().includes(normalized))
+    .slice(0, 10);
 }

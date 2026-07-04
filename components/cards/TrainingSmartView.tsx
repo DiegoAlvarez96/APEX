@@ -2,7 +2,8 @@
 
 import { Check, Copy, Dumbbell, Pencil, Plus, Replace, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Card, SectionTitle } from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
+import { CompactDisclosure } from "@/components/ui/CompactDisclosure";
 import { DateNavigator } from "@/components/ui/DateNavigator";
 import { InlineStatus, LoadingButton } from "@/components/ui/Loading";
 import { DateTimeService } from "@/lib/date";
@@ -167,22 +168,32 @@ export function TrainingSmartView({
 
   return (
     <div className="space-y-5">
-      <DateNavigator title="Entrenamiento" eyebrow="Rutina del dia e historial" selectedDate={selectedDate} onSelectDate={onSelectDate} />
+      <DateNavigator title="Entrenamiento" eyebrow="Entrenamiento del dia" selectedDate={selectedDate} onSelectDate={onSelectDate} />
 
-      <Card>
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <SectionTitle title="Planificacion semanal" eyebrow="Agenda compartida" />
-          <LoadingButton loading={loading === "ai"} loadingLabel="Generando..." className="min-h-10 rounded-2xl bg-white px-3 text-xs font-semibold text-black" onClick={() => void generateWorkout()}>Generar rutina</LoadingButton>
+      <CompactDisclosure title="Entrenamiento del dia" eyebrow={`${assignedTemplate.exercises.length} ejercicios · intensidad ${assignedTemplate.intensity}`} defaultOpen>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">{assignedTemplate.group}</p>
+            <p className="truncate text-xs text-[rgb(var(--muted))]">{assignedTemplate.focus}</p>
+          </div>
+          <LoadingButton loading={loading === "ai"} loadingLabel="Generando..." className="min-h-9 rounded-xl bg-[rgb(var(--training))] px-3 text-xs font-semibold text-black" onClick={() => void generateWorkout()}>IA</LoadingButton>
         </div>
-        <div className="rounded-2xl bg-limeglass/15 p-4 light:bg-black/[0.04]">
-          <p className="text-sm text-white/55 light:text-black/55">Asignado para {selectedDateKey}</p>
-          <p className="mt-1 text-xl font-semibold">{assignedTemplate.group} - {assignedTemplate.focus}</p>
-          <p className="mt-2 text-sm text-white/55 light:text-black/55">{assignedTemplate.exercises.length} ejercicios - intensidad {assignedTemplate.intensity}</p>
+        <div className="grid grid-cols-3 gap-2">
+          <MiniMetric label="Rutina" value={assignedTemplate.group} />
+          <MiniMetric label="Progreso" value={`${workouts.filter((workout) => workout.completed).length}/${Math.max(workouts.length, 1)}`} />
+          <MiniMetric label="Fecha" value={selectedDateKey.slice(5)} />
         </div>
-      </Card>
+        <div className="mt-3 space-y-1.5">
+          {assignedTemplate.exercises.slice(0, 5).map((exercise) => (
+            <div key={exercise.id} className="rounded-xl bg-[rgb(var(--training))]/12 px-3 py-2 text-xs">
+              <span className="font-semibold">{exercise.name}</span>
+              <span className="ml-2 text-[rgb(var(--muted))]">{exercise.sets.length} series</span>
+            </div>
+          ))}
+        </div>
+      </CompactDisclosure>
 
-      <Card>
-        <SectionTitle title="Plantillas" eyebrow="Cambiar rutina del dia" />
+      <CompactDisclosure title="Cambiar rutina" eyebrow="Plantillas">
         <div className="grid gap-3">
           <select className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={group} onChange={(event) => setGroup(event.target.value)}>
             {groups.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -199,10 +210,9 @@ export function TrainingSmartView({
             ))}
           </div>
         </div>
-      </Card>
+      </CompactDisclosure>
 
-      <Card>
-        <SectionTitle title={editing ? "Editar entrenamiento del dia" : "Registrar entrenamiento del dia"} eyebrow={selectedDateKey} />
+      <CompactDisclosure title={editing ? "Editar ejercicios" : "Registrar ejercicios"} eyebrow={selectedDateKey}>
         <div className="grid gap-3">
           <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={title} onChange={(event) => setTitle(event.target.value)} />
           <div className="grid grid-cols-2 gap-3">
@@ -215,16 +225,16 @@ export function TrainingSmartView({
           <p className="text-xs leading-5 text-white/45 light:text-black/45">Formato: ejercicio series x reps x peso, RIR opcional y descanso. Ejemplo: Remo 4x12x40 rir2 rest90.</p>
           <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" placeholder="Observaciones" value={notes} onChange={(event) => setNotes(event.target.value)} />
           <div className="grid grid-cols-2 gap-2">
-            <LoadingButton loading={loading === "workout"} loadingLabel="Guardando..." className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" onClick={() => void submit()}><Plus size={18} /> {editing ? "Guardar cambios" : "Guardar entrenamiento"}</LoadingButton>
+            <LoadingButton loading={loading === "workout"} loadingLabel="Guardando..." className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[rgb(var(--training))] font-semibold text-black" onClick={() => void submit()}><Plus size={18} /> {editing ? "Guardar cambios" : "Guardar entrenamiento"}</LoadingButton>
             <LoadingButton loading={loading === "template"} loadingLabel="Guardando..." className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-white text-black" onClick={() => void saveTemplate()}><Copy size={18} /> Guardar plantilla</LoadingButton>
           </div>
           <InlineStatus message={status.message} tone={status.tone} />
         </div>
-      </Card>
+      </CompactDisclosure>
 
       <div className="space-y-3">
         {workouts.map((workout) => (
-          <Card key={workout.id} className="p-4">
+          <CompactDisclosure key={workout.id} title="Progreso e historial" eyebrow={`${workout.title} · ${workout.exercises.length} ejercicios`}>
             <div className="flex items-start gap-3">
               <div className="grid size-11 place-items-center rounded-2xl bg-white/[0.08] light:bg-black/[0.05]"><Dumbbell className="text-limeglass" size={20} /></div>
               <div className="min-w-0 flex-1">
@@ -253,7 +263,7 @@ export function TrainingSmartView({
               <Action icon={Copy} label="Duplicar" onClick={() => void onDuplicateWorkout(workout)} />
               <Action icon={Trash2} label="Eliminar" onClick={() => workout.id && void onDeleteWorkout(workout.id)} />
             </div>
-          </Card>
+          </CompactDisclosure>
         ))}
         {workouts.length === 0 ? (
           <Card className="p-4">
@@ -278,6 +288,15 @@ function exerciseToRaw(exercise: WorkoutExercise) {
 
 function Action({ icon: Icon, label, onClick }: { icon: typeof Pencil; label: string; onClick: () => void }) {
   return <button className="flex h-10 items-center justify-center gap-1 rounded-2xl bg-white/[0.08] text-xs light:bg-black/[0.05]" onClick={onClick} type="button"><Icon size={14} />{label}</button>;
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-xl bg-[rgb(var(--surface-strong))] px-2 py-2">
+      <p className="text-[10px] text-[rgb(var(--muted))]">{label}</p>
+      <p className="truncate text-xs font-semibold">{value}</p>
+    </div>
+  );
 }
 
 function parseExercises(value: string): WorkoutExercise[] {

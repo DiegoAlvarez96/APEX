@@ -125,8 +125,27 @@ model User {
   connections    ExternalConnection[]
   notifications  Notification[]
   healthMetrics  HealthMetric[]
+  syncRecords    ClientSyncRecord[]
 
   @@map("users")
+}
+
+model ClientSyncRecord {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  collection String
+  localId    String   @map("local_id")
+  operation  String   @default("upsert")
+  payload    Json
+  syncedAt   DateTime @default(now()) @map("synced_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  isDeleted  Boolean  @default(false) @map("is_deleted")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, collection, localId])
+  @@index([userId, collection])
+  @@map("client_sync_records")
 }
 
 model UserProfile {

@@ -13,6 +13,14 @@
   --accent: 216 255 100;
   --accent-2: 94 234 212;
   --danger: 255 111 97;
+  --nutrition: 130 214 151;
+  --training: 238 159 103;
+  --agenda: 111 174 232;
+  --ai: 178 143 232;
+  --tasks: 112 220 214;
+  --finance: 232 197 98;
+  --health: 234 126 126;
+  --habits: 185 149 111;
   --background: rgb(var(--bg));
   --foreground: rgb(var(--text));
 }
@@ -28,6 +36,14 @@
   --accent: 188 230 72;
   --accent-2: 0 138 128;
   --danger: 210 78 68;
+  --nutrition: 77 161 103;
+  --training: 204 112 60;
+  --agenda: 58 126 194;
+  --ai: 137 103 202;
+  --tasks: 41 158 153;
+  --finance: 190 145 42;
+  --health: 204 82 82;
+  --habits: 140 101 67;
   --background: rgb(var(--bg));
   --foreground: rgb(var(--text));
 }
@@ -56,6 +72,16 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+.lucide {
+  width: 15px;
+  height: 15px;
+}
+
+.nav-action .lucide {
+  width: 22px;
+  height: 22px;
 }
 
 .glass {

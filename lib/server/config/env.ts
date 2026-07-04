@@ -56,9 +56,8 @@ export function requireEnv<K extends keyof ApexEnv>(key: K): NonNullable<ApexEnv
 
 export function getDatabaseUrl() {
   if (env.DATABASE_URL) return env.DATABASE_URL;
-  if (env.NODE_ENV === "production") {
-    throw new Error("DATABASE_URL is required in production.");
-  }
+  // Next.js may import API routes during production build before deployment
+  // secrets are available. Runtime DB calls still require a real connection.
   return "postgresql://user:password@localhost:5432/apex?schema=public";
 }
 

@@ -1,16 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { db, defaultSettings, ensureSettings } from "@/lib/db";
+import { db, defaultSettings, ensureFinanceSettings, ensureSettings } from "@/lib/db";
 import { DateTimeService, addDays, dateFromKey, dateKey, monthStart } from "@/lib/date";
 import { buildStockAlerts, summarizeProductStock } from "@/lib/stock";
 import { buildShoppingSuggestions } from "@/lib/shopping";
 import { answerLocalChat } from "@/lib/chat";
 import { calculateSleepDuration } from "@/lib/sleep";
 import { normalizeNutritionLog } from "@/lib/nutrition";
+import { buildFinanceRuleKey } from "@/lib/finance";
 import { getRoutineForDate } from "@/lib/routines";
+import { startApexAutoSync, syncApexSnapshot } from "@/lib/sync";
 import { assignedWorkoutTemplateForDate } from "@/lib/trainingTemplates";
-import type { AgendaNote, ApexAlert, AppSettings, BodyMeasurement, ChatMessage, FoodEntry, NutritionLog, NutritionPlanItem, Product, ProductConsumption, ProgressPhoto, ShoppingItem, SleepLog, TaskCompletion, Workout, WorkoutTemplate } from "@/types/apex";
+import type { AgendaNote, ApexAlert, AppSettings, BodyMeasurement, ChatMessage, FinanceCategoryRule, FinancePaymentMethod, FinanceScheduledPayment, FinanceSettings, FinanceTransaction, FoodEntry, NutritionLog, NutritionPlanItem, Product, ProductConsumption, ProgressPhoto, ShoppingItem, SleepLog, TaskCompletion, Workout, WorkoutTemplate } from "@/types/apex";
 
 const APEX_PROCESS_START_DATE_KEY = "2026-07-01";
 
@@ -29,13 +31,18 @@ export function useApexStore(selectedDate: Date) {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [agendaNotes, setAgendaNotes] = useState<AgendaNote[]>([]);
   const [sleepLogs, setSleepLogs] = useState<SleepLog[]>([]);
+  const [financeTransactions, setFinanceTransactions] = useState<FinanceTransaction[]>([]);
+  const [financeCategoryRules, setFinanceCategoryRules] = useState<FinanceCategoryRule[]>([]);
+  const [financePaymentMethods, setFinancePaymentMethods] = useState<FinancePaymentMethod[]>([]);
+  const [financeScheduledPayments, setFinanceScheduledPayments] = useState<FinanceScheduledPayment[]>([]);
+  const [financeSettings, setFinanceSettings] = useState<FinanceSettings | null>(null);
   const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
   const [settings, setSettingsState] = useState<AppSettings>(defaultSettings);
   const [chatAiStatus, setChatAiStatus] = useState<"available" | "offline" | "checking">("offline");
   const [ready, setReady] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [nextCompletions, nextProducts, nextConsumptions, nextAlerts, nextNutritionLogs, nextWorkouts, nextTemplates, nextBody, nextShopping, nextChat, nextAgendaNotes, nextSleepLogs, nextPhotos, nextSettings] = await Promise.all([
+    const [nextCompletions, nextProducts, nextConsumptions, nextAlerts, nextNutritionLogs, nextWorkouts, nextTemplates, nextBody, nextShopping, nextChat, nextAgendaNotes, nextSleepLogs, nextFinanceTransactions, nextFinanceCategoryRules, nextFinancePaymentMethods, nextFinanceScheduledPayments, nextFinanceSettings, nextPhotos, nextSettings] = await Promise.all([
       db.completions.where("dateKey").equals(selectedDateKey).toArray(),
       db.products.orderBy("purchaseDate").reverse().toArray(),
       db.productConsumptions.orderBy("createdAt").reverse().toArray(),
@@ -48,6 +55,11 @@ export function useApexStore(selectedDate: Date) {
       db.chatMessages.orderBy("createdAt").toArray(),
       db.agendaNotes.orderBy("updatedAt").reverse().toArray(),
       db.sleepLogs.orderBy("createdAt").reverse().toArray(),
+      db.financeTransactions.orderBy("occurredAt").reverse().toArray(),
+      db.financeCategoryRules.orderBy("updatedAt").reverse().toArray(),
+      db.financePaymentMethods.orderBy("updatedAt").reverse().toArray(),
+      db.financeScheduledPayments.orderBy("dueDateKey").toArray(),
+      ensureFinanceSettings(),
       db.photos.orderBy("createdAt").reverse().toArray(),
       ensureSettings()
     ]);
@@ -64,6 +76,11 @@ export function useApexStore(selectedDate: Date) {
     setChatMessages(nextChat);
     setAgendaNotes(nextAgendaNotes);
     setSleepLogs(nextSleepLogs);
+    setFinanceTransactions(nextFinanceTransactions);
+    setFinanceCategoryRules(nextFinanceCategoryRules);
+    setFinancePaymentMethods(nextFinancePaymentMethods);
+    setFinanceScheduledPayments(nextFinanceScheduledPayments);
+    setFinanceSettings(nextFinanceSettings);
     setPhotos(nextPhotos);
     setSettingsState(nextSettings);
     setReady(true);
@@ -90,6 +107,8 @@ export function useApexStore(selectedDate: Date) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => startApexAutoSync({ intervalMs: 10_000 }), []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("light", settings.theme === "light");
@@ -118,6 +137,7 @@ export function useApexStore(selectedDate: Date) {
         });
       }
       await refresh();
+      void syncApexSnapshot();
     },
     [refresh, selectedDateKey]
   );
@@ -127,6 +147,7 @@ export function useApexStore(selectedDate: Date) {
       const initialStock = product.initialStock ?? product.size ?? product.quantity;
       await db.products.add({ ...product, group: product.group, initialStock, size: product.size ?? initialStock, quantity: initialStock, createdAt: DateTimeService.nowIso() });
       await refresh();
+      void syncApexSnapshot();
     },
     [refresh]
   );
@@ -135,6 +156,7 @@ export function useApexStore(selectedDate: Date) {
     async (id: number, quantity: number) => {
       await db.products.update(id, { quantity });
       await refresh();
+      void syncApexSnapshot();
     },
     [refresh]
   );
@@ -149,6 +171,7 @@ export function useApexStore(selectedDate: Date) {
         createdAt: DateTimeService.nowIso()
       });
       await refresh();
+      void syncApexSnapshot();
     },
     [refresh, selectedDateKey]
   );
@@ -287,12 +310,13 @@ export function useApexStore(selectedDate: Date) {
     bodyMeasurements: recentBodyMeasurements(bodyMeasurements, 30),
     sleep: selectedSleep,
     sleepLogs: recentByDate(sleepLogs, 30),
+    financeTransactions: recentByDate(financeTransactions, 60),
     shoppingItems,
     alerts,
     completions: recentByDate(allCompletions, 30),
     agendaNotes: recentByDate(agendaNotes, 30),
     settings
-  }), [agendaNotes, alerts, allCompletions, bodyMeasurements, latestBody, nutritionLogs, productConsumptions, products, selectedDate, selectedDateKey, selectedNutrition, selectedSleep, settings, shoppingItems, sleepLogs, stockSummaries, workoutTemplates, workouts]);
+  }), [agendaNotes, alerts, allCompletions, bodyMeasurements, financeTransactions, latestBody, nutritionLogs, productConsumptions, products, selectedDate, selectedDateKey, selectedNutrition, selectedSleep, settings, shoppingItems, sleepLogs, stockSummaries, workoutTemplates, workouts]);
 
   const sendChatMessage = useCallback(async (content: string) => {
     await db.chatMessages.add({ role: "user", content, createdAt: DateTimeService.nowIso() });
@@ -342,6 +366,55 @@ export function useApexStore(selectedDate: Date) {
     else await db.sleepLogs.add({ ...payload, createdAt: DateTimeService.nowIso() });
     await refresh();
   }, [refresh, selectedDateKey]);
+
+  const addFinanceTransaction = useCallback(async (transaction: Omit<FinanceTransaction, "id" | "createdAt" | "updatedAt">) => {
+    const now = DateTimeService.nowIso();
+    const transactionId = await db.financeTransactions.add({ ...transaction, createdAt: now, updatedAt: now });
+    if (transaction.installments?.count && transaction.installments.count > 1) {
+      const first = dateFromKey(transaction.installments.firstDueDateKey);
+      const scheduled = Array.from({ length: transaction.installments.count }, (_, index) => ({
+        transactionId,
+        title: `${transaction.description} cuota ${index + 1}/${transaction.installments!.count}`,
+        amount: transaction.installments!.amountPerInstallment,
+        currency: transaction.currency,
+        dueDateKey: dateKey(new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + index, first.getUTCDate(), 12))),
+        extraInfo: transaction.extraInfo,
+        createdAt: now,
+        updatedAt: now
+      }));
+      await db.financeScheduledPayments.bulkAdd(scheduled);
+    }
+    const ruleKey = buildFinanceRuleKey(transaction.description);
+    if (ruleKey) {
+      const existing = await db.financeCategoryRules.where("key").equals(ruleKey).first();
+      if (existing?.id) await db.financeCategoryRules.update(existing.id, { category: transaction.category, updatedAt: now });
+      else await db.financeCategoryRules.add({ key: ruleKey, category: transaction.category, createdAt: now, updatedAt: now });
+    }
+    await refresh();
+    void syncApexSnapshot();
+  }, [refresh]);
+
+  const deleteFinanceTransaction = useCallback(async (id: number) => {
+    await db.financeTransactions.delete(id);
+    await db.financeScheduledPayments.where("transactionId").equals(id).delete();
+    await refresh();
+    void syncApexSnapshot();
+  }, [refresh]);
+
+  const addFinancePaymentMethod = useCallback(async (method: Omit<FinancePaymentMethod, "id" | "createdAt" | "updatedAt">) => {
+    const now = DateTimeService.nowIso();
+    const id = await db.financePaymentMethods.add({ ...method, createdAt: now, updatedAt: now });
+    const settings = await ensureFinanceSettings();
+    if (!settings.defaultPaymentMethodId) await db.financeSettings.update("finance", { defaultPaymentMethodId: id, updatedAt: now });
+    await refresh();
+    return id;
+  }, [refresh]);
+
+  const updateFinanceSettings = useCallback(async (next: Partial<FinanceSettings>) => {
+    const current = await ensureFinanceSettings();
+    await db.financeSettings.put({ ...current, ...next, id: "finance", updatedAt: DateTimeService.nowIso() });
+    await refresh();
+  }, [refresh]);
 
   const estimateFood = useCallback(async (text: string): Promise<FoodEntry> => {
     const key = text.trim().toLowerCase();
@@ -419,6 +492,11 @@ export function useApexStore(selectedDate: Date) {
       chatMessages: await db.chatMessages.toArray(),
       agendaNotes: await db.agendaNotes.toArray(),
       sleepLogs: await db.sleepLogs.toArray(),
+      financeTransactions: await db.financeTransactions.toArray(),
+      financeCategoryRules: await db.financeCategoryRules.toArray(),
+      financePaymentMethods: await db.financePaymentMethods.toArray(),
+      financeScheduledPayments: await db.financeScheduledPayments.toArray(),
+      financeSettings: await db.financeSettings.toArray(),
       photos: await db.photos.toArray(),
       settings: await db.settings.toArray()
     };
@@ -446,6 +524,11 @@ export function useApexStore(selectedDate: Date) {
     selectedAgendaNote,
     sleepLogs,
     selectedSleep,
+    financeTransactions,
+    financeCategoryRules,
+    financePaymentMethods,
+    financeScheduledPayments,
+    financeSettings,
     photos,
     settings,
     chatAiStatus,
@@ -474,6 +557,10 @@ export function useApexStore(selectedDate: Date) {
     clearChat,
     saveAgendaNote,
     saveSleepLog,
+    addFinanceTransaction,
+    deleteFinanceTransaction,
+    addFinancePaymentMethod,
+    updateFinanceSettings,
     estimateFood,
     generateNutritionPlan,
     generateWorkoutPlan,
