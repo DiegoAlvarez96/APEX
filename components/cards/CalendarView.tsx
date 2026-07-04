@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui/Card";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import { TaskList } from "@/components/cards/TaskList";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { addDays, dateKey, dayOfMonth, fullDate, monthStart, monthTitle, weekdayInAppTimeZone } from "@/lib/date";
@@ -47,6 +48,8 @@ export function CalendarView({
   onToggle: (taskId: string) => void;
 }) {
   const [draftNote, setDraftNote] = useState(note ?? "");
+  const [sheet, setSheet] = useState<"dashboard" | "nutrition" | "training" | "physical" | null>(null);
+  const [displayMode, setDisplayMode] = useState<"day" | "week" | "month" | "timeline">(mode);
   const selectedDateKey = dateKey(selectedDate);
   const selectedDateLabel = fullDate(selectedDate);
   const previousDateLabel = fullDate(addDays(selectedDate, -1));
@@ -60,8 +63,13 @@ export function CalendarView({
   useEffect(() => {
     setDraftNote(note ?? "");
   }, [note, selectedDate]);
+
+  useEffect(() => {
+    if (displayMode === "week" || displayMode === "month") onModeChange(displayMode);
+  }, [displayMode, onModeChange]);
+
   const days =
-    mode === "week"
+    displayMode === "week" || displayMode === "day"
       ? Array.from({ length: 7 }, (_, index) => addDays(selectedDate, index - weekdayInAppTimeZone(selectedDate)))
       : Array.from({ length: 35 }, (_, index) => {
           const start = monthStart(selectedDate);
@@ -85,7 +93,7 @@ export function CalendarView({
         </div>
       </header>
 
-      <SegmentedControl value={mode} onChange={onModeChange} options={[{ value: "week", label: "Semana" }, { value: "month", label: "Mes" }]} />
+      <SegmentedControl value={displayMode} onChange={setDisplayMode} options={[{ value: "day", label: "Dia" }, { value: "week", label: "Semana" }, { value: "month", label: "Mes" }, { value: "timeline", label: "Timeline" }]} />
 
       <Card>
         <SectionTitle title={monthTitle(selectedDate)} />
@@ -118,14 +126,17 @@ export function CalendarView({
       <Card>
         <SectionTitle title={`Dia ${selectedDateLabel}`} eyebrow="Detalle del dia" />
         <div className="grid grid-cols-2 gap-2">
-          <button className="w-full text-left" type="button" onClick={() => onOpenModule("dashboard")}><AgendaMetric label="Skincare" value={`${skincareTasks.filter((task) => isDone(task.id)).length}/${skincareTasks.length}`} /></button>
-          <button className="w-full text-left" type="button" onClick={() => onOpenModule("nutrition")}><AgendaMetric label="Nutricion" value={nutrition ? `${Math.round(nutrition.calories)} kcal` : "Sin cargar"} /></button>
-          <button className="w-full text-left" type="button" onClick={() => onOpenModule("training")}><AgendaMetric label="Entreno" value={workoutsForDay.length ? `${workoutsForDay.length}` : assignedWorkout.group} /></button>
-          <AgendaMetric label="Sueno ant." value={previousSleep ? formatSleepDuration(previousSleep.durationMinutes) : "Sin cargar"} />
+          <button className="w-full text-left" type="button" onClick={() => setSheet("dashboard")}><AgendaMetric label="Skincare" value={`${skincareTasks.filter((task) => isDone(task.id)).length}/${skincareTasks.length}`} /></button>
+          <button className="w-full text-left" type="button" onClick={() => setSheet("nutrition")}><AgendaMetric label="Nutricion" value={nutrition ? `${Math.round(nutrition.calories)} kcal` : "Sin cargar"} /></button>
+          <button className="w-full text-left" type="button" onClick={() => setSheet("training")}><AgendaMetric label="Entreno" value={workoutsForDay.length ? `${workoutsForDay.length}` : assignedWorkout.group} /></button>
+          <button className="w-full text-left" type="button" onClick={() => setSheet("physical")}><AgendaMetric label="Fisico" value={bodyForDay ? `${bodyForDay.weightKg} kg` : "Sin cargar"} /></button>
         </div>
-        <AgendaBlock title="Suplementos" items={detail.supplements} />
-        <AgendaBlock title="Habitos" items={detail.habits} />
-        <AgendaBlock title="Notas" items={detail.notes} />
+        <div className="mt-4 space-y-3">
+          <TimelineHour label="Ahora" title="Indicador de hora actual" detail={new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit" }).format(new Date())} active />
+          <AgendaBlock title="Suplementos" items={detail.supplements} />
+          <AgendaBlock title="Habitos" items={detail.habits} />
+          <AgendaBlock title="Notas" items={detail.notes} />
+        </div>
       </Card>
 
       <NutritionAgendaCard nutrition={nutrition} selectedDateLabel={selectedDateLabel} onOpen={() => onOpenModule("nutrition")} />
@@ -142,15 +153,83 @@ export function CalendarView({
         <textarea className="mt-4 min-h-24 w-full rounded-3xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={draftNote} onChange={(event) => setDraftNote(event.target.value)} placeholder="Notas, correcciones, objetivos o actividades del dia" />
         <button className="mt-3 h-11 w-full rounded-2xl bg-limeglass font-semibold text-black" type="button" onClick={() => onSaveNote(draftNote)}>Guardar nota</button>
       </Card>
+
+      <BottomSheet open={sheet !== null} title={sheetTitle(sheet)} eyebrow={selectedDateLabel} onClose={() => setSheet(null)}>
+        {sheet === "dashboard" ? (
+          <div className="space-y-4">
+            <button type="button" className="w-full text-left" onClick={() => onOpenModule("dashboard")}>
+              <h3 className="text-lg font-semibold">Abrir Skincare completo</h3>
+              <p className="mt-1 text-sm text-[rgb(var(--muted))]">Toca el titulo para editar toda la rutina.</p>
+            </button>
+            <TaskList tasks={skincareTasks} isDone={isDone} onToggle={onToggle} />
+          </div>
+        ) : null}
+        {sheet === "nutrition" ? (
+          <SheetSummary onOpen={() => onOpenModule("nutrition")} title="Abrir Nutricion completa" rows={[
+            ["Calorias", nutrition ? `${Math.round(nutrition.calories)} kcal` : "Sin cargar"],
+            ["Proteina", nutrition ? `${Math.round(nutrition.protein)} g` : "-"],
+            ["Agua", nutrition ? `${(nutrition.waterMl / 1000).toFixed(1)} L` : "-"]
+          ]} />
+        ) : null}
+        {sheet === "training" ? (
+          <SheetSummary onOpen={() => onOpenModule("training")} title="Abrir Entrenamiento completo" rows={[
+            ["Plan", assignedWorkout.group],
+            ["Foco", assignedWorkout.focus],
+            ["Registrados", `${workoutsForDay.length}`]
+          ]} />
+        ) : null}
+        {sheet === "physical" ? (
+          <SheetSummary onOpen={() => onOpenModule("physical")} title="Abrir Fisico completo" rows={[
+            ["Peso", bodyForDay ? `${bodyForDay.weightKg} kg` : "Sin cargar"],
+            ["Cintura", bodyForDay?.waistCm ? `${bodyForDay.waistCm} cm` : "-"],
+            ["Grasa", bodyForDay?.bodyFatPercent ? `${bodyForDay.bodyFatPercent}%` : "-"]
+          ]} />
+        ) : null}
+      </BottomSheet>
     </div>
   );
 }
 
 function AgendaMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white/[0.06] p-3 light:bg-black/[0.04]">
-      <p className="text-[11px] text-white/40 light:text-black/40">{label}</p>
+    <div className="rounded-2xl bg-[rgb(var(--surface-strong))] p-3">
+      <p className="text-[11px] text-[rgb(var(--muted))]">{label}</p>
       <p className="mt-1 truncate text-sm font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function sheetTitle(sheet: "dashboard" | "nutrition" | "training" | "physical" | null) {
+  if (sheet === "dashboard") return "Skincare";
+  if (sheet === "nutrition") return "Nutricion";
+  if (sheet === "training") return "Entrenamiento";
+  if (sheet === "physical") return "Fisico";
+  return "Detalle";
+}
+
+function SheetSummary({ title, rows, onOpen }: { title: string; rows: [string, string][]; onOpen: () => void }) {
+  return (
+    <div className="space-y-4">
+      <button type="button" className="w-full text-left" onClick={onOpen}>
+        <h3 className="text-lg font-semibold">{title}</h3>
+        <p className="mt-1 text-sm text-[rgb(var(--muted))]">Toca el titulo para ver o editar el modulo completo.</p>
+      </button>
+      <div className="grid grid-cols-2 gap-2">
+        {rows.map(([label, value]) => <AgendaMetric key={label} label={label} value={value} />)}
+      </div>
+    </div>
+  );
+}
+
+function TimelineHour({ label, title, detail, active }: { label: string; title: string; detail: string; active?: boolean }) {
+  return (
+    <div className="flex gap-3 rounded-2xl bg-[rgb(var(--surface-strong))] p-3">
+      <div className="w-12 shrink-0 text-xs font-semibold text-[rgb(var(--muted))]">{label}</div>
+      <div className={`mt-1 size-3 shrink-0 rounded-full ${active ? "bg-[rgb(var(--accent))]" : "bg-[rgb(var(--border))]"}`} />
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="text-xs text-[rgb(var(--muted))]">{detail}</p>
+      </div>
     </div>
   );
 }

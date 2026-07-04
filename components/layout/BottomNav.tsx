@@ -1,25 +1,19 @@
 "use client";
 
-import { CalendarDays, Dumbbell, Home, Package, ShoppingCart, Sparkles, UserRound, Utensils } from "lucide-react";
+import { Plus } from "lucide-react";
+import { pinnedModules } from "@/lib/modules";
 
 export type ViewKey = "home" | "dashboard" | "calendar" | "nutrition" | "training" | "physical" | "health" | "products" | "shopping" | "alerts" | "timeline" | "ai" | "chat" | "stats" | "settings" | "sleep";
 
-const items = [
-  { key: "home", label: "Inicio", icon: Home },
-  { key: "calendar", label: "Agenda", icon: CalendarDays },
-  { key: "dashboard", label: "Skincare", icon: Sparkles },
-  { key: "nutrition", label: "Nutri", icon: Utensils },
-  { key: "training", label: "Entrenamiento", icon: Dumbbell },
-  { key: "physical", label: "Fisico", icon: UserRound },
-  { key: "shopping", label: "Compras", icon: ShoppingCart },
-  { key: "products", label: "Stock", icon: Package }
-] satisfies { key: ViewKey; label: string; icon: typeof Home }[];
-
 export function BottomNav({ active, onChange }: { active: ViewKey; onChange: (view: ViewKey) => void }) {
+  const items = pinnedModules();
+  const leftItems = items.slice(0, 2);
+  const rightItems = items.slice(2, 4);
+
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 safe-bottom px-3 pb-3">
-      <div className="glass no-scrollbar mx-auto flex max-w-xl gap-1 overflow-x-auto rounded-[26px] p-2">
-        {items.map((item) => {
+    <nav className="fixed inset-x-0 bottom-0 z-50 safe-bottom px-4 pb-3">
+      <div className="mx-auto grid h-20 max-w-xl grid-cols-[1fr_1fr_72px_1fr_1fr] items-center rounded-[30px] border border-[rgb(var(--border))] bg-[rgb(var(--surface-strong))]/92 px-3 shadow-soft backdrop-blur-2xl">
+        {leftItems.map((item) => {
           const Icon = item.icon;
           const isActive = active === item.key;
           return (
@@ -27,13 +21,39 @@ export function BottomNav({ active, onChange }: { active: ViewKey; onChange: (vi
               key={item.key}
               type="button"
               onClick={() => onChange(item.key)}
-              className={`flex h-14 w-[5.4rem] shrink-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[10px] font-medium transition ${
-                isActive ? "bg-white text-black light:bg-black light:text-white" : "text-white/55 light:text-black/50"
+              className={`flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[10px] font-semibold transition ${
+                isActive ? "text-[rgb(var(--text))]" : "text-[rgb(var(--muted))]"
               }`}
               aria-label={item.label}
             >
-              <Icon size={19} strokeWidth={isActive ? 2.5 : 2} />
-              <span className="max-w-full truncate">{item.label}</span>
+              <Icon size={20} strokeWidth={isActive ? 2.6 : 2} />
+              <span className="max-w-full truncate">{item.shortLabel}</span>
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => onChange("home")}
+          className="-mt-8 grid size-[72px] place-items-center rounded-full bg-[rgb(var(--accent))] text-black shadow-action transition active:scale-95"
+          aria-label="Abrir inicio"
+        >
+          <Plus size={30} strokeWidth={2.5} />
+        </button>
+        {rightItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = active === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => onChange(item.key)}
+              className={`flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[10px] font-semibold transition ${
+                isActive ? "text-[rgb(var(--text))]" : "text-[rgb(var(--muted))]"
+              }`}
+              aria-label={item.label}
+            >
+              <Icon size={20} strokeWidth={isActive ? 2.6 : 2} />
+              <span className="max-w-full truncate">{item.shortLabel}</span>
             </button>
           );
         })}

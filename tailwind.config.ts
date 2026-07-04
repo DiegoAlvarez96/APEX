@@ -12,15 +12,17 @@ const config: Config = {
     extend: {
       colors: {
         ink: "#f8fafc",
-        mist: "rgba(255, 255, 255, 0.08)",
+        mist: "rgb(var(--surface))",
         graphite: "#101114",
-        limeglass: "#d8ff64",
-        coral: "#ff6f61",
-        aqua: "#5eead4"
+        limeglass: "rgb(var(--accent))",
+        coral: "rgb(var(--danger))",
+        aqua: "rgb(var(--accent-2))"
       },
       boxShadow: {
-        glow: "0 18px 70px rgba(216, 255, 100, 0.12)",
-        panel: "0 20px 80px rgba(0, 0, 0, 0.22)"
+        glow: "0 18px 70px rgba(216, 255, 100, 0.10)",
+        panel: "0 24px 80px rgba(0, 0, 0, 0.28)",
+        soft: "0 12px 34px rgba(0, 0, 0, 0.12)",
+        action: "0 16px 34px rgba(216, 255, 100, 0.22)"
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "Inter", "system-ui", "sans-serif"]

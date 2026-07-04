@@ -1,0 +1,50 @@
+"use client";
+
+import { AnimatePresence, motion } from "framer-motion";
+import { X } from "lucide-react";
+import type { ReactNode } from "react";
+
+export function BottomSheet({
+  open,
+  title,
+  eyebrow,
+  children,
+  onClose
+}: {
+  open: boolean;
+  title: string;
+  eyebrow?: string;
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {open ? (
+        <motion.div className="fixed inset-0 z-[70]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <button type="button" className="absolute inset-0 bg-black/45" aria-label="Cerrar panel" onClick={onClose} />
+          <motion.section
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 32, stiffness: 360 }}
+            className="absolute inset-x-0 bottom-0 mx-auto max-h-[86dvh] max-w-xl overflow-hidden rounded-t-[30px] border border-[rgb(var(--border))] bg-[rgb(var(--surface-strong))] shadow-panel"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-[rgb(var(--border))]" />
+            <header className="flex items-center justify-between gap-3 px-5 py-4">
+              <div className="min-w-0">
+                {eyebrow ? <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[rgb(var(--muted))]">{eyebrow}</p> : null}
+                <h2 className="truncate text-xl font-semibold">{title}</h2>
+              </div>
+              <button type="button" className="grid size-10 shrink-0 place-items-center rounded-full bg-[rgb(var(--surface))]" onClick={onClose} aria-label="Cerrar">
+                <X size={18} />
+              </button>
+            </header>
+            <div className="max-h-[calc(86dvh-92px)] overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+24px)]">{children}</div>
+          </motion.section>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}

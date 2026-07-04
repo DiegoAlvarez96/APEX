@@ -1,8 +1,9 @@
 "use client";
 
-import { Bell, Download, Moon, Sun } from "lucide-react";
+import { Bell, Download, Moon, Sun, type LucideIcon } from "lucide-react";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { dateKey } from "@/lib/date";
+import { enabledModules } from "@/lib/modules";
 import type { AppSettings } from "@/types/apex";
 
 export function SettingsView({
@@ -41,43 +42,31 @@ export function SettingsView({
         <h1 className="text-3xl font-semibold">Configuracion</h1>
       </header>
 
-      <Card>
+      <Card className="p-2">
         <SectionTitle title="Apariencia" />
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => onUpdateSettings({ theme: "dark" })}
-            className={`flex h-20 items-center justify-center gap-2 rounded-3xl ${settings.theme === "dark" ? "bg-limeglass text-black" : "bg-white/[0.06] light:bg-black/[0.04]"}`}
-          >
-            <Moon size={18} /> Oscuro
-          </button>
-          <button
-            type="button"
-            onClick={() => onUpdateSettings({ theme: "light" })}
-            className={`flex h-20 items-center justify-center gap-2 rounded-3xl ${settings.theme === "light" ? "bg-black text-white" : "bg-white/[0.06] light:bg-black/[0.04]"}`}
-          >
-            <Sun size={18} /> Claro
-          </button>
-        </div>
+        <SettingRow icon={Moon} label="Modo oscuro" value={settings.theme === "dark"} onToggle={() => onUpdateSettings({ theme: settings.theme === "dark" ? "light" : "dark" })} />
+        <SettingRow icon={Sun} label="Tema claro" value={settings.theme === "light"} onToggle={() => onUpdateSettings({ theme: settings.theme === "light" ? "dark" : "light" })} />
       </Card>
 
-      <Card>
+      <Card className="p-2">
         <SectionTitle title="Recordatorios" />
         <div className="space-y-3">
           <TimeRow label="Rutina manana" value={settings.morningReminder} onChange={(morningReminder) => onUpdateSettings({ morningReminder })} />
           <TimeRow label="Rutina noche" value={settings.nightReminder} onChange={(nightReminder) => onUpdateSettings({ nightReminder })} />
-          <label className="flex items-center justify-between rounded-2xl bg-white/[0.06] p-4 light:bg-black/[0.04]">
-            <span>Dermaroller jueves</span>
-            <input
-              className="size-5 accent-limeglass"
-              type="checkbox"
-              checked={settings.dermarollerReminder}
-              onChange={(event) => onUpdateSettings({ dermarollerReminder: event.target.checked })}
-            />
-          </label>
+          <SettingRow icon={Bell} label="Dermaroller jueves" value={settings.dermarollerReminder} onToggle={() => onUpdateSettings({ dermarollerReminder: !settings.dermarollerReminder })} />
           <button className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white text-black" onClick={() => void enableNotifications()} type="button">
             <Bell size={18} /> {settings.notificationsEnabled ? "Notificaciones activas" : "Activar notificaciones"}
           </button>
+        </div>
+      </Card>
+
+      <Card className="p-2">
+        <SectionTitle title="Modulos" eyebrow="Orden y visibilidad" />
+        <div className="space-y-1">
+          {enabledModules().map((module) => {
+            const Icon = module.icon;
+            return <SettingRow key={module.key} icon={Icon} label={module.label} value={module.enabled} disabled />;
+          })}
         </div>
       </Card>
 
@@ -118,9 +107,35 @@ export function SettingsView({
 
 function TimeRow({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
-    <label className="flex items-center justify-between rounded-2xl bg-white/[0.06] p-4 light:bg-black/[0.04]">
+    <label className="flex min-h-14 items-center justify-between rounded-2xl bg-[rgb(var(--surface-strong))] px-4">
       <span>{label}</span>
       <input className="rounded-xl bg-transparent text-right outline-none" type="time" value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
+  );
+}
+
+function SettingRow({
+  icon: Icon,
+  label,
+  value,
+  disabled,
+  onToggle
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: boolean;
+  disabled?: boolean;
+  onToggle?: () => void;
+}) {
+  return (
+    <button type="button" disabled={disabled} onClick={onToggle} className="flex min-h-14 w-full items-center justify-between gap-3 rounded-2xl px-3 text-left disabled:opacity-80">
+      <span className="flex items-center gap-3">
+        <Icon size={18} className="text-[rgb(var(--accent-2))]" />
+        <span className="text-sm font-medium">{label}</span>
+      </span>
+      <span className={`relative h-8 w-[52px] rounded-full transition ${value ? "bg-[rgb(var(--accent))]" : "bg-[rgb(var(--surface-strong))]"}`}>
+        <span className={`absolute top-1 size-6 rounded-full bg-white shadow-sm transition ${value ? "left-6" : "left-1"}`} />
+      </span>
+    </button>
   );
 }

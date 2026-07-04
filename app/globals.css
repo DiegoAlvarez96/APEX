@@ -4,14 +4,32 @@
 
 :root {
   color-scheme: dark;
-  --background: #07080a;
-  --foreground: #f8fafc;
+  --bg: 9 10 12;
+  --surface: 24 25 29;
+  --surface-strong: 32 34 39;
+  --text: 248 250 252;
+  --muted: 148 157 171;
+  --border: 55 59 67;
+  --accent: 216 255 100;
+  --accent-2: 94 234 212;
+  --danger: 255 111 97;
+  --background: rgb(var(--bg));
+  --foreground: rgb(var(--text));
 }
 
 :root.light {
   color-scheme: light;
-  --background: #f5f5f7;
-  --foreground: #14161a;
+  --bg: 245 245 247;
+  --surface: 255 255 255;
+  --surface-strong: 239 241 245;
+  --text: 20 22 26;
+  --muted: 96 104 116;
+  --border: 219 223 230;
+  --accent: 188 230 72;
+  --accent-2: 0 138 128;
+  --danger: 210 78 68;
+  --background: rgb(var(--bg));
+  --foreground: rgb(var(--text));
 }
 
 * {
@@ -27,11 +45,10 @@ body {
   min-height: 100%;
   margin: 0;
   overflow-x: hidden;
-  background:
-    radial-gradient(circle at 18% -10%, rgba(94, 234, 212, 0.18), transparent 32rem),
-    radial-gradient(circle at 90% 0%, rgba(216, 255, 100, 0.11), transparent 28rem),
-    var(--background);
+  background: var(--background);
   color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -42,16 +59,15 @@ textarea {
 }
 
 .glass {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgb(var(--border));
+  background: rgba(var(--surface), 0.86);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
 }
 
 .light .glass {
-  border-color: rgba(20, 22, 26, 0.1);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.86);
 }
 
 .safe-bottom {

@@ -1,3 +1,5 @@
+import { env } from "@/lib/server/config/env";
+
 export type OpenAiResponsePayload = {
   output_text?: string;
   output?: { content?: { text?: string }[] }[];
@@ -32,13 +34,13 @@ export async function requestOpenAiText({
   logPrefix: string;
   logPayload?: Record<string, unknown>;
 }) {
-  const apiKey = normalizeOpenAiApiKey(process.env.OPENAI_API_KEY);
+  const apiKey = normalizeOpenAiApiKey(env.OPENAI_API_KEY);
   if (!apiKey) {
     logOpenAi(logPrefix, "error", { ...logPayload, code: "missing_api_key" });
     throw new OpenAiServiceError("missing_api_key", "Missing OPENAI_API_KEY");
   }
 
-  const openAiRequest = { model: request.model ?? "gpt-4.1-mini", ...request };
+  const openAiRequest = { model: request.model ?? env.OPENAI_DEFAULT_MODEL, ...request };
   logOpenAi(logPrefix, "request", { ...logPayload, request: openAiRequest });
 
   let response: Response;

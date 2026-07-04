@@ -1,0 +1,487 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  USER
+  TESTER
+  GUEST
+}
+
+enum PermissionRole {
+  OWNER
+  ADMIN
+  USER
+  READONLY
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  APPLE
+  PHONE
+  WHATSAPP
+}
+
+enum ModuleKey {
+  HOME
+  NUTRITION
+  TRAINING
+  ROUTINE
+  EVENTS
+  FINANCE
+  AI
+  INTEGRATIONS
+  NOTIFICATIONS
+  CALENDAR
+  HEALTH
+  PRODUCTS
+  SHOPPING
+  SLEEP
+  PHYSICAL
+  CARE
+}
+
+enum ExternalProvider {
+  GOOGLE_CALENDAR
+  GOOGLE_FIT
+  APPLE_HEALTH
+  APPLE_LOGIN
+  GARMIN
+  FITBIT
+  SMARTWATCH
+  WHATSAPP
+  OPENAI
+  SUPABASE
+}
+
+enum ConnectionStatus {
+  PENDING
+  ACTIVE
+  ERROR
+  DISABLED
+}
+
+enum NotificationChannel {
+  IN_APP
+  PUSH
+  EMAIL
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  READ
+  FAILED
+  DISABLED
+}
+
+enum AiLogStatus {
+  SUCCESS
+  ERROR
+}
+
+enum HealthMetricType {
+  STEPS
+  ACTIVE_CALORIES
+  SLEEP
+  HEART_RATE
+  WORKOUT
+}
+
+model User {
+  id             String               @id @default(cuid())
+  email          String?              @unique
+  phone          String?              @unique
+  passwordHash   String?              @map("password_hash")
+  role           UserRole             @default(USER)
+  permissionRole PermissionRole       @default(OWNER) @map("permission_role")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  isDeleted      Boolean              @default(false) @map("is_deleted")
+  profile        UserProfile?
+  authAccounts   AuthAccount[]
+  modules        Module[]
+  userModules    UserModule[]
+  routines       Routine[]
+  routineTasks   RoutineTask[]
+  products       Product[]
+  productUsage   ProductUsage[]
+  workouts       Workout[]
+  exercises      Exercise[]
+  workoutLogs    WorkoutLog[]
+  nutritionLogs  NutritionLog[]
+  foods          Food[]
+  events         Event[]
+  finance        FinanceTransaction[]
+  aiLogs         AiLog[]
+  connections    ExternalConnection[]
+  notifications  Notification[]
+  healthMetrics  HealthMetric[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique @map("user_id")
+  displayName String?  @map("display_name")
+  avatarUrl   String?  @map("avatar_url")
+  locale      String   @default("es-AR")
+  timezone    String   @default("America/Argentina/Buenos_Aires")
+  preferences Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  isDeleted   Boolean  @default(false) @map("is_deleted")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model AuthAccount {
+  id                String       @id @default(cuid())
+  userId            String       @map("user_id")
+  provider          AuthProvider
+  providerAccountId String       @map("provider_account_id")
+  accessToken       String?      @map("access_token")
+  refreshToken      String?      @map("refresh_token")
+  expiresAt         DateTime?    @map("expires_at")
+  scope             String?
+  tokenType         String?      @map("token_type")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+  isDeleted         Boolean      @default(false) @map("is_deleted")
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("auth_accounts")
+}
+
+model Module {
+  id          String      @id @default(cuid())
+  userId      String      @map("user_id")
+  key         ModuleKey
+  name        String
+  description String?
+  sortOrder   Int         @default(0) @map("sort_order")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  isDeleted   Boolean     @default(false) @map("is_deleted")
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userModules UserModule[]
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@map("modules")
+}
+
+model UserModule {
+  id                 String    @id @default(cuid())
+  userId             String    @map("user_id")
+  moduleId           String    @map("module_id")
+  enabled            Boolean   @default(true)
+  notificationsEnabled Boolean @default(true) @map("notifications_enabled")
+  aiEnabled          Boolean   @default(true) @map("ai_enabled")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  isDeleted          Boolean   @default(false) @map("is_deleted")
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module             Module    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleId])
+  @@index([userId])
+  @@map("user_modules")
+}
+
+model Routine {
+  id        String        @id @default(cuid())
+  userId    String        @map("user_id")
+  title     String
+  category  String
+  metadata  Json?
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  isDeleted Boolean       @default(false) @map("is_deleted")
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks     RoutineTask[]
+
+  @@index([userId, category])
+  @@map("routines")
+}
+
+model RoutineTask {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  routineId String   @map("routine_id")
+  title     String
+  schedule  Json?
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  routine   Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+
+  @@index([userId, routineId])
+  @@map("routine_tasks")
+}
+
+model Product {
+  id          String         @id @default(cuid())
+  userId      String         @map("user_id")
+  name        String
+  brand       String?
+  category    String
+  stock       Decimal?       @db.Decimal(10, 2)
+  unit        String?
+  metadata    Json?
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  isDeleted   Boolean        @default(false) @map("is_deleted")
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productUsage ProductUsage[]
+
+  @@index([userId, category])
+  @@map("products")
+}
+
+model ProductUsage {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  productId String   @map("product_id")
+  amount    Decimal? @db.Decimal(10, 2)
+  usedAt    DateTime @default(now()) @map("used_at")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([userId, productId])
+  @@map("product_usage")
+}
+
+model Workout {
+  id          String       @id @default(cuid())
+  userId      String       @map("user_id")
+  title       String
+  focus       String?
+  scheduledAt DateTime?    @map("scheduled_at")
+  metadata    Json?
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  isDeleted   Boolean      @default(false) @map("is_deleted")
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercises   Exercise[]
+  logs        WorkoutLog[]
+
+  @@index([userId, scheduledAt])
+  @@map("workouts")
+}
+
+model Exercise {
+  id        String       @id @default(cuid())
+  userId    String       @map("user_id")
+  workoutId String?      @map("workout_id")
+  name      String
+  muscle    String?
+  metadata  Json?
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  isDeleted Boolean      @default(false) @map("is_deleted")
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workout   Workout?     @relation(fields: [workoutId], references: [id], onDelete: SetNull)
+  logs      WorkoutLog[]
+
+  @@index([userId, workoutId])
+  @@map("exercises")
+}
+
+model WorkoutLog {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  workoutId  String?   @map("workout_id")
+  exerciseId String?   @map("exercise_id")
+  reps       Int?
+  sets       Int?
+  weight     Decimal?  @db.Decimal(10, 2)
+  rir        Int?
+  restSec    Int?      @map("rest_sec")
+  performedAt DateTime @default(now()) @map("performed_at")
+  metadata   Json?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  isDeleted  Boolean   @default(false) @map("is_deleted")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workout    Workout?  @relation(fields: [workoutId], references: [id], onDelete: SetNull)
+  exercise   Exercise? @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
+
+  @@index([userId, performedAt])
+  @@map("workout_logs")
+}
+
+model Food {
+  id        String         @id @default(cuid())
+  userId    String         @map("user_id")
+  name      String
+  brand     String?
+  calories  Decimal?       @db.Decimal(10, 2)
+  protein   Decimal?       @db.Decimal(10, 2)
+  carbs     Decimal?       @db.Decimal(10, 2)
+  fat       Decimal?       @db.Decimal(10, 2)
+  metadata  Json?
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  isDeleted Boolean        @default(false) @map("is_deleted")
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs      NutritionLog[]
+
+  @@index([userId, name])
+  @@map("foods")
+}
+
+model NutritionLog {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  foodId    String?  @map("food_id")
+  mealType  String?  @map("meal_type")
+  loggedAt  DateTime @default(now()) @map("logged_at")
+  calories  Decimal? @db.Decimal(10, 2)
+  protein   Decimal? @db.Decimal(10, 2)
+  carbs     Decimal? @db.Decimal(10, 2)
+  fat       Decimal? @db.Decimal(10, 2)
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  food      Food?    @relation(fields: [foodId], references: [id], onDelete: SetNull)
+
+  @@index([userId, loggedAt])
+  @@map("nutrition_logs")
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  title     String
+  startsAt  DateTime @map("starts_at")
+  endsAt    DateTime? @map("ends_at")
+  source    String   @default("internal")
+  externalId String? @map("external_id")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startsAt])
+  @@map("events")
+}
+
+model FinanceTransaction {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  type      String
+  category  String
+  amount    Decimal  @db.Decimal(14, 2)
+  currency  String   @default("ARS")
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, occurredAt])
+  @@map("finance_transactions")
+}
+
+model AiLog {
+  id        String      @id @default(cuid())
+  userId    String      @map("user_id")
+  moduleKey ModuleKey?  @map("module_key")
+  status    AiLogStatus
+  model     String
+  prompt    String?
+  response  String?
+  error     String?
+  tokens    Int?
+  metadata  Json?
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  isDeleted Boolean     @default(false) @map("is_deleted")
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, moduleKey, createdAt])
+  @@map("ai_logs")
+}
+
+model ExternalConnection {
+  id             String           @id @default(cuid())
+  userId         String           @map("user_id")
+  provider       ExternalProvider
+  status         ConnectionStatus @default(PENDING)
+  externalUserId String?          @map("external_user_id")
+  accessToken    String?          @map("access_token")
+  refreshToken   String?          @map("refresh_token")
+  expiresAt      DateTime?        @map("expires_at")
+  scopes         String[]
+  metadata       Json?
+  lastSyncedAt   DateTime?        @map("last_synced_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  isDeleted      Boolean          @default(false) @map("is_deleted")
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId, status])
+  @@map("external_connections")
+}
+
+model Notification {
+  id          String              @id @default(cuid())
+  userId      String              @map("user_id")
+  moduleKey   ModuleKey?          @map("module_key")
+  channel     NotificationChannel @default(IN_APP)
+  status      NotificationStatus  @default(PENDING)
+  title       String
+  body        String?
+  scheduledAt DateTime?           @map("scheduled_at")
+  sentAt      DateTime?           @map("sent_at")
+  metadata    Json?
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  isDeleted   Boolean             @default(false) @map("is_deleted")
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, scheduledAt])
+  @@map("notifications")
+}
+
+model HealthMetric {
+  id         String           @id @default(cuid())
+  userId     String           @map("user_id")
+  type       HealthMetricType
+  value      Decimal?         @db.Decimal(14, 4)
+  unit       String?
+  source     String
+  measuredAt DateTime         @map("measured_at")
+  metadata   Json?
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+  isDeleted  Boolean          @default(false) @map("is_deleted")
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, measuredAt])
+  @@map("health_metrics")
+}
