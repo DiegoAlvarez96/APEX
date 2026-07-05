@@ -1,32 +1,21 @@
 "use client";
 
-import { Bell, Download, Moon, Sun, type LucideIcon } from "lucide-react";
-import { SportSettingsPanel } from "@/components/cards/SportSettingsPanel";
+import { Bell, Download, Dumbbell, Moon, Settings, Sun, type LucideIcon } from "lucide-react";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { dateKey } from "@/lib/date";
 import { enabledModules } from "@/lib/modules";
-import type { AppSettings, SportProfile } from "@/types/apex";
+import type { AppSettings } from "@/types/apex";
 
 export function SettingsView({
   settings,
   onUpdateSettings,
   onExport,
-  sportProfiles,
-  onAddSportProfile,
-  onUpdateSportProfile,
-  onDeleteSportProfile,
-  onDuplicateSportProfile,
-  onOpenAgenda
+  onOpenTrainingSettings
 }: {
   settings: AppSettings;
   onUpdateSettings: (settings: Partial<AppSettings>) => void;
   onExport: () => Promise<string>;
-  sportProfiles: SportProfile[];
-  onAddSportProfile: (profile: Omit<SportProfile, "id" | "createdAt" | "updatedAt">) => Promise<void> | void;
-  onUpdateSportProfile: (id: number, profile: Partial<SportProfile>) => Promise<void> | void;
-  onDeleteSportProfile: (id: number, mode: "future" | "all") => Promise<void> | void;
-  onDuplicateSportProfile: (profile: SportProfile) => Promise<void> | void;
-  onOpenAgenda: () => void;
+  onOpenTrainingSettings: () => void;
 }) {
   async function enableNotifications() {
     if (!("Notification" in window)) return;
@@ -83,15 +72,16 @@ export function SettingsView({
         </div>
       </Card>
 
-      <Card className="p-4">
-        <SportSettingsPanel
-          sports={sportProfiles}
-          onAdd={onAddSportProfile}
-          onUpdate={onUpdateSportProfile}
-          onDelete={onDeleteSportProfile}
-          onDuplicate={onDuplicateSportProfile}
-          onOpenAgenda={onOpenAgenda}
-        />
+      <Card className="p-2">
+        <div className="flex min-h-14 items-center justify-between gap-3 px-3">
+          <span className="flex items-center gap-3 text-sm font-medium">
+            <Dumbbell size={18} className="text-[rgb(var(--module-accent))]" />
+            Entrenamiento
+          </span>
+          <button type="button" onClick={onOpenTrainingSettings} className="grid size-9 place-items-center rounded-full bg-[rgb(var(--surface-strong))] text-[rgb(var(--module-accent))]" aria-label="Configurar entrenamiento">
+            <Settings size={16} />
+          </button>
+        </div>
       </Card>
 
       <Card>

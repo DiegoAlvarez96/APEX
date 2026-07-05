@@ -4,7 +4,10 @@ import {
   Activity,
   ArrowLeft,
   BarChart3,
+  CalendarDays,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Copy,
   Droplets,
@@ -19,6 +22,7 @@ import {
   Play,
   Plus,
   Save,
+  Settings,
   ShieldAlert,
   Sparkles,
   TimerReset,
@@ -29,13 +33,15 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
-import { DateNavigator } from "@/components/ui/DateNavigator";
-import { DateTimeService } from "@/lib/date";
+import { DateTimeService, addDays, dateKey, formatDateKey, weekdayInAppTimeZone } from "@/lib/date";
 import { assignedWorkoutTemplateForDate, cloneTemplateExercises } from "@/lib/trainingTemplates";
-import type { SportProfile, Workout, WorkoutExercise, WorkoutTemplate } from "@/types/apex";
+import type { SportEventType, SportMode, SportProfile, SportSchedule, Workout, WorkoutExercise, WorkoutTemplate } from "@/types/apex";
 
 type Screen = "dashboard" | "list" | "exercise" | "rest" | "summary" | "history";
 type ModalKind = "set" | "save" | "delete" | "finish" | "added" | "up" | "down" | "injury" | "hydration" | "longRest" | "pr" | undefined;
+type SportCardState = "pending" | "active" | "done" | "skipped";
+type SportTemplate = "strength_template" | "running_template" | "crossfit_template" | "calisthenics_template" | "cycling_template" | "swimming_template" | "combat_template" | "mobility_template" | "simple_sport_template";
+type ScheduledSport = { profile: SportProfile; schedule: SportSchedule };
 
 const muscleImages: Record<string, string> = {
   espalda: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=900&q=80",
@@ -53,8 +59,8 @@ export function TrainingSmartView({
   onAddWorkout,
   onUpdateWorkout,
   templates,
-  onAddTemplate,
   sportProfiles,
+  onDeleteSportProfile,
   onOpenSportSettings
 }: {
   selectedDate: Date;
@@ -70,6 +76,7 @@ export function TrainingSmartView({
   onDeleteTemplate: (id: number) => Promise<void> | void;
   onGenerateWorkout: (targetDateKey?: string) => Promise<Omit<Workout, "id">>;
   sportProfiles: SportProfile[];
+  onDeleteSportProfile?: (id: number) => Promise<void> | void;
   onOpenSportSettings: () => void;
 }) {
   const assignedTemplate = useMemo(() => assignedWorkoutTemplateForDate(selectedDate, templates), [selectedDate, templates]);
@@ -108,6 +115,10 @@ export function TrainingSmartView({
   const nextSet = activeExercise?.sets.findIndex((set) => !set.completed) ?? 0;
   const muscleKey = Object.keys(muscleImages).find((key) => workoutDraft.title.toLowerCase().includes(key)) ?? "pecho";
   const heroImage = muscleImages[muscleKey];
+  const selectedWeekday = weekdayInAppTimeZone(selectedDate);
+  const scheduledSports = sportProfiles
+    .filter((profile) => profile.status === "active")
+    .flatMap((profile) => profile.schedules.filter((schedule) => schedule.weekday === selectedWeekday).map((schedule) => ({ profile, schedule })));
 
   async function saveWorkout(markComplete = false) {
     setIsSaving(true);
@@ -181,7 +192,7 @@ export function TrainingSmartView({
   return (
     <div className="space-y-4 pb-4 text-white">
       {screen !== "exercise" && screen !== "rest" ? (
-        <DateNavigator title="Entrenamiento" eyebrow="Coach IA" selectedDate={selectedDate} onSelectDate={onSelectDate} />
+        <TrainingHeader selectedDate={selectedDate} onSelectDate={onSelectDate} onOpenSportSettings={onOpenSportSettings} />
       ) : null}
 
       <AnimatePresence mode="wait">
@@ -192,11 +203,10 @@ export function TrainingSmartView({
               progress={progress}
               volume={volume}
               heroImage={heroImage}
-              onStart={() => setScreen("list")}
-              isSaving={isSaving}
-              sportProfiles={sportProfiles}
+              scheduledSports={scheduledSports}
               onOpenSportSettings={onOpenSportSettings}
-              onSaveTemplate={() => void onAddTemplate({ name: `${workoutDraft.title} premium`, group: workoutDraft.title, focus: workoutDraft.focus, intensity: workoutDraft.intensity, notes: workoutDraft.notes, exercises: workoutDraft.exercises, source: "user" })}
+              onDeleteSportProfile={onDeleteSportProfile}
+              onStart={() => setScreen("list")}
             />
           </MotionScreen>
         ) : null}
@@ -289,21 +299,19 @@ function DashboardScreen({
   progress,
   volume,
   heroImage,
-  isSaving,
-  onStart,
-  onSaveTemplate,
-  sportProfiles,
-  onOpenSportSettings
+  scheduledSports,
+  onOpenSportSettings,
+  onDeleteSportProfile,
+  onStart
 }: {
   workout: Workout;
   progress: number;
   volume: number;
   heroImage: string;
-  isSaving: boolean;
-  onStart: () => void;
-  onSaveTemplate: () => void;
-  sportProfiles: SportProfile[];
+  scheduledSports: ScheduledSport[];
   onOpenSportSettings: () => void;
+  onDeleteSportProfile?: (id: number) => Promise<void> | void;
+  onStart: () => void;
 }) {
   return (
     <div className="space-y-4">
@@ -317,7 +325,7 @@ function DashboardScreen({
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">Entrenamiento de hoy</p>
             <h1 className="mt-2 text-3xl font-semibold leading-tight">{workout.title}</h1>
-            <p className="mt-1 text-sm text-white/58">{workout.focus} Â· {workout.exercises.length} ejercicios</p>
+            <p className="mt-1 text-sm text-white/58">{workout.focus} Ã‚Â· {workout.exercises.length} ejercicios</p>
           </div>
           <ProgressLine value={progress} />
           <div className="grid grid-cols-2 gap-2 text-xs">
@@ -340,33 +348,306 @@ function DashboardScreen({
         </div>
       </section>
 
-      <div className="grid grid-cols-2 gap-3">
-        <StatTile label="Rutinas completadas" value="18" detail="+12% mensual" />
-        <StatTile label="Volumen semanal" value="42.8k" detail="86% objetivo" />
-        <StatTile label="Historial semanal" value="4/5" detail="1 dia restante" />
-        <StatTile label="Volumen objetivo" value={`${targetVolume(workout)} kg`} detail="Adaptativo IA" />
+      {scheduledSports.length ? (
+        <section className="space-y-3">
+          {scheduledSports.map((item) => (
+            <SportTrainingCard
+              key={`${item.profile.id ?? item.profile.name}-${item.schedule.id}`}
+              item={item}
+              onEdit={onOpenSportSettings}
+              onDelete={onDeleteSportProfile}
+            />
+          ))}
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function SportTrainingCard({ item, onEdit, onDelete }: { item: ScheduledSport; onEdit: () => void; onDelete?: (id: number) => Promise<void> | void }) {
+  const { profile, schedule } = item;
+  const template = sportTemplateFor(profile);
+  const isSimple = profile.mode === "card_only" || template === "simple_sport_template";
+  const [state, setState] = useState<SportCardState>("pending");
+  const [intensity, setIntensity] = useState(3);
+  const [note, setNote] = useState("");
+  const [expanded, setExpanded] = useState(!isSimple);
+  const blocks = sportBlocksFor(profile, schedule, template);
+  const accent = schedule.type === "competition" ? "#ef4444" : profile.accent || "#B6FF3B";
+
+  function handleDelete() {
+    if (!profile.id || !onDelete) {
+      onEdit();
+      return;
+    }
+    if (window.confirm(`Eliminar ${profile.name}?`)) void onDelete(profile.id);
+  }
+
+  return (
+    <motion.article
+      layout
+      className="overflow-hidden rounded-[24px] border border-white/10 bg-[#15161a]/95 p-4 shadow-panel"
+      style={{ boxShadow: `inset 0 1px 0 rgba(255,255,255,.04), 0 18px 45px ${hexToRgba(accent, 0.09)}` }}
+    >
+      <div className="flex items-start gap-3">
+        <div className="grid size-12 shrink-0 place-items-center rounded-[18px] border border-white/10" style={{ backgroundColor: hexToRgba(accent, 0.14), color: accent }}>
+          <SportIcon template={template} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-base font-semibold">{profile.name}</p>
+              <p className="mt-1 text-xs text-white/48">{eventTypeLabel(schedule.type)} · {schedule.startTime}-{schedule.endTime} · {profile.mode === "custom_training" ? "IA personalizada" : "Solo card"}</p>
+            </div>
+            <span className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase" style={{ backgroundColor: hexToRgba(accent, 0.14), color: accent }}>
+              {statusLabel(state)}
+            </span>
+          </div>
+          {profile.notes ? <p className="mt-2 line-clamp-2 text-xs leading-5 text-white/45">{profile.notes}</p> : null}
+        </div>
       </div>
 
-      <section className="rounded-[22px] border border-white/10 bg-white/[0.045] p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold">Deportes configurados</p>
-            <p className="mt-1 text-xs text-white/45">{sportProfiles.filter((item) => item.status === "active").length} activos en agenda y entrenamiento</p>
-          </div>
-          <button type="button" onClick={onOpenSportSettings} className="h-11 shrink-0 rounded-2xl bg-[rgb(var(--module-accent))] px-4 text-sm font-bold text-black">Configurar deportes</button>
-        </div>
-        {sportProfiles.length ? (
-          <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar">
-            {sportProfiles.slice(0, 6).map((profile) => (
-              <span key={profile.id ?? profile.name} className="shrink-0 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs" style={{ color: profile.accent }}>{profile.name}</span>
-            ))}
-          </div>
-        ) : null}
-      </section>
+      <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+        <InfoBlock label="Objetivo" value={goalLabel(profile.goal)} />
+        <InfoBlock label="Tipo" value={templateLabel(template)} />
+        <InfoBlock label="Modo" value={modeLabel(profile.mode)} />
+      </div>
 
-      <button disabled={isSaving} type="button" onClick={onSaveTemplate} className="flex h-12 w-full items-center justify-center gap-2 rounded-[18px] border border-white/10 bg-white/[0.055] text-sm font-semibold">
-        <Save size={16} /> Guardar como rutina
+      {!isSimple && expanded ? (
+        <div className="mt-3 space-y-2">
+          {blocks.map((block) => (
+            <div key={block.title} className="rounded-[18px] border border-white/8 bg-white/[0.045] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">{block.title}</p>
+                {block.meta ? <span className="rounded-full bg-white/8 px-2 py-1 text-[10px] text-white/55">{block.meta}</span> : null}
+              </div>
+              <p className="mt-1 text-xs leading-5 text-white/55">{block.detail}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {isSimple ? (
+        <div className="mt-3 rounded-[18px] border border-white/8 bg-white/[0.045] p-3">
+          <p className="text-sm font-semibold">Actividad simple</p>
+          <p className="mt-1 text-xs leading-5 text-white/55">Se registra en agenda y entrenamiento sin forzar ejercicios, series ni estructura interna.</p>
+          {profile.mode === "custom_training" ? (
+            <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-3 h-10 w-full rounded-[14px] border border-white/10 bg-white/[0.06] text-xs font-semibold">
+              Generar estructura con IA
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mt-3">
+        <p className="mb-2 text-[11px] font-semibold uppercase text-white/35">Intensidad</p>
+        <div className="grid grid-cols-5 gap-1.5">
+          {[1, 2, 3, 4, 5].map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setIntensity(value)}
+              className="h-9 rounded-[12px] text-xs font-bold transition active:scale-[0.97]"
+              style={{ backgroundColor: value <= intensity ? hexToRgba(accent, 0.22) : "rgba(255,255,255,.06)", color: value <= intensity ? accent : "rgba(255,255,255,.42)" }}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <input
+        value={note}
+        onChange={(event) => setNote(event.target.value)}
+        placeholder="Nota rapida..."
+        className="mt-3 h-11 w-full rounded-[16px] border border-white/8 bg-white/[0.045] px-3 text-sm outline-none placeholder:text-white/30 focus:border-white/18"
+      />
+
+      <div className="mt-3 grid grid-cols-[1fr_44px_44px] gap-2">
+        <button
+          type="button"
+          onClick={() => setState((current) => (current === "active" ? "done" : "active"))}
+          className="h-12 rounded-[16px] text-sm font-bold text-black transition active:scale-[0.98]"
+          style={{ backgroundColor: accent }}
+        >
+          {state === "active" ? "Finalizar" : state === "done" ? "Completado" : schedule.type === "competition" ? "Iniciar competencia" : "Comenzar"}
+        </button>
+        <button type="button" onClick={onEdit} className="grid h-12 place-items-center rounded-[16px] bg-white/[0.07] text-white/65" aria-label="Editar deporte">
+          <Edit3 size={17} />
+        </button>
+        <button type="button" onClick={handleDelete} className="grid h-12 place-items-center rounded-[16px] bg-white/[0.07] text-red-300" aria-label="Eliminar deporte">
+          <Trash2 size={17} />
+        </button>
+      </div>
+
+      <button type="button" onClick={() => setState("skipped")} className="mt-2 h-10 w-full rounded-[14px] bg-white/[0.04] text-xs font-semibold text-white/42">
+        Saltar por hoy
       </button>
+    </motion.article>
+  );
+}
+
+function sportTemplateFor(profile: SportProfile): SportTemplate {
+  const text = `${profile.name} ${profile.specification} ${profile.customSpecification ?? ""}`.toLowerCase();
+  if (profile.mode === "card_only") return "simple_sport_template";
+  if (profile.category === "strength") {
+    if (text.includes("crossfit")) return "crossfit_template";
+    if (text.includes("calisten") || text.includes("street")) return "calisthenics_template";
+    return "strength_template";
+  }
+  if (profile.category === "running") return "running_template";
+  if (profile.category === "cycling") return "cycling_template";
+  if (profile.category === "swimming") return "swimming_template";
+  if (profile.category === "martial") return "combat_template";
+  if (profile.category === "wellness") return "mobility_template";
+  return "simple_sport_template";
+}
+
+function sportBlocksFor(profile: SportProfile, schedule: SportSchedule, template: SportTemplate) {
+  const competitionNote = schedule.type === "competition" ? "Competencia: priorizar entrada en calor, estrategia y recuperacion." : "Entrenamiento planificado por IA.";
+  switch (template) {
+    case "strength_template":
+      return [
+        { title: "Bloque principal", detail: "Ejercicio base 4x6-8, RIR 2, descanso 120s.", meta: "Fuerza" },
+        { title: "Accesorios", detail: "2-3 ejercicios complementarios, 3x10-12, foco tecnico.", meta: "Volumen" },
+        { title: "IA carga", detail: "Ajustar peso segun rendimiento previo, sueno, HRV y fatiga acumulada.", meta: "+/- 2.5 kg" }
+      ];
+    case "running_template":
+      return [
+        { title: "Calentamiento", detail: "8-10 min suave + movilidad dinamica.", meta: "Z2" },
+        { title: "Bloque principal", detail: schedule.type === "competition" ? "Ritmo objetivo con estrategia por parciales." : "Intervalos o tempo segun objetivo semanal.", meta: "Pace" },
+        { title: "Enfriamiento", detail: "5-8 min suave, respiracion nasal y registro de RPE.", meta: competitionNote }
+      ];
+    case "crossfit_template":
+      return [
+        { title: "Warm-up", detail: "8 min de movilidad, activacion y tecnica del patron dominante.", meta: "Inicio" },
+        { title: "Strength / Skill", detail: "Progresion tecnica con cargas submaximas y descanso controlado.", meta: "Tecnica" },
+        { title: "WOD", detail: "AMRAP / EMOM segun objetivo, con escala automatica por fatiga.", meta: "IA scale" }
+      ];
+    case "calisthenics_template":
+      return [
+        { title: "Skill", detail: "Practica tecnica: holds, progresiones o dominadas estrictas.", meta: "Control" },
+        { title: "Fuerza", detail: "Series por nivel con RIR 1-3 y descanso completo.", meta: "Progresion" },
+        { title: "Core", detail: "Trabajo anti-extension y estabilidad escapular.", meta: "Soporte" }
+      ];
+    case "cycling_template":
+      return [
+        { title: "Entrada en calor", detail: "10 min cadencia comoda, potencia progresiva.", meta: "Z1-Z2" },
+        { title: "Bloque principal", detail: "Series por potencia o FC segun recuperacion y objetivo.", meta: "Watts" },
+        { title: "Vuelta a la calma", detail: "Rodaje suave y nota de piernas para ajustar la proxima carga.", meta: "RPE" }
+      ];
+    case "swimming_template":
+      return [
+        { title: "Tecnica", detail: "Drills de respiracion, alineacion y agarre.", meta: "Agua" },
+        { title: "Serie principal", detail: "Bloques por distancia, ritmo y descanso fijo.", meta: "Pace" },
+        { title: "Soltar", detail: "Nado suave, movilidad de hombro y registro de sensaciones.", meta: "Recuperar" }
+      ];
+    case "combat_template":
+      return [
+        { title: "Activacion", detail: "Movilidad, sombra y coordinacion.", meta: "Inicio" },
+        { title: "Tecnica", detail: "Combinaciones, desplazamientos y defensa.", meta: "Skill" },
+        { title: "Condicionamiento", detail: "Rounds controlados por FC y fatiga.", meta: "Rounds" }
+      ];
+    case "mobility_template":
+      return [
+        { title: "Respiracion", detail: "2-4 min para bajar tension y preparar rangos.", meta: "Reset" },
+        { title: "Movilidad", detail: "Caderas, columna, hombros y tobillos segun historial.", meta: "Rango" },
+        { title: "Integracion", detail: "Patrones lentos con control, sin dolor.", meta: "Calidad" }
+      ];
+    default:
+      return [{ title: profile.name, detail: competitionNote, meta: eventTypeLabel(schedule.type) }];
+  }
+}
+
+function SportIcon({ template }: { template: SportTemplate }) {
+  if (template === "running_template" || template === "cycling_template" || template === "swimming_template") return <Activity size={22} />;
+  if (template === "combat_template") return <ShieldAlert size={22} />;
+  if (template === "mobility_template") return <HeartPulse size={22} />;
+  if (template === "simple_sport_template") return <CalendarDays size={22} />;
+  return <Dumbbell size={22} />;
+}
+
+function eventTypeLabel(type: SportEventType) {
+  return type === "competition" ? "Competicion" : "Entrenamiento";
+}
+
+function modeLabel(mode: SportMode) {
+  return mode === "custom_training" ? "IA" : "Simple";
+}
+
+function goalLabel(goal: SportProfile["goal"]) {
+  if (goal === "professional") return "Profesional";
+  if (goal === "amateur") return "Amateur";
+  return "Hobby";
+}
+
+function templateLabel(template: SportTemplate) {
+  const labels: Record<SportTemplate, string> = {
+    strength_template: "Fuerza",
+    running_template: "Running",
+    crossfit_template: "CrossFit",
+    calisthenics_template: "Calistenia",
+    cycling_template: "Ciclismo",
+    swimming_template: "Natacion",
+    combat_template: "Combate",
+    mobility_template: "Movilidad",
+    simple_sport_template: "Simple"
+  };
+  return labels[template];
+}
+
+function statusLabel(state: SportCardState) {
+  if (state === "active") return "Activo";
+  if (state === "done") return "Hecho";
+  if (state === "skipped") return "Saltado";
+  return "Pendiente";
+}
+
+function hexToRgba(hex: string, alpha: number) {
+  const clean = hex.replace("#", "");
+  const parsed = clean.length === 3 ? clean.split("").map((char) => `${char}${char}`).join("") : clean;
+  const value = Number.parseInt(parsed, 16);
+  if (Number.isNaN(value)) return `rgba(182,255,59,${alpha})`;
+  const red = (value >> 16) & 255;
+  const green = (value >> 8) & 255;
+  const blue = value & 255;
+  return `rgba(${red},${green},${blue},${alpha})`;
+}
+
+function TrainingHeader({ selectedDate, onSelectDate, onOpenSportSettings }: { selectedDate: Date; onSelectDate: (date: Date) => void; onOpenSportSettings: () => void }) {
+  const selectedKey = dateKey(selectedDate);
+  const yesterday = addDays(selectedDate, -1);
+  const tomorrow = addDays(selectedDate, 1);
+  const todayKey = dateKey();
+  const label = selectedKey === todayKey ? `${formatDateKey(selectedKey)} Hoy` : formatDateKey(selectedKey);
+
+  return (
+    <div className="space-y-3">
+      <header className="px-1 pt-2">
+        <div>
+          <p className="text-sm text-white/45 light:text-black/45">Coach IA</p>
+          <div className="mt-1 flex items-center gap-2">
+            <h1 className="text-3xl font-semibold uppercase">Entrenamiento</h1>
+            <button type="button" onClick={onOpenSportSettings} className="grid size-10 place-items-center rounded-2xl border border-white/10 bg-white/[0.07] text-[rgb(var(--module-accent))]" aria-label="Configurar entrenamiento">
+              <Settings size={18} />
+            </button>
+          </div>
+        </div>
+      </header>
+      <div className="no-scrollbar flex gap-2 overflow-x-auto px-1">
+        <button className="flex h-10 shrink-0 items-center gap-1 rounded-full bg-[rgba(var(--module-accent),0.08)] px-3 text-xs text-[rgb(var(--muted))]" type="button" onClick={() => onSelectDate(yesterday)}>
+          <ChevronLeft size={15} /> {formatDateKey(dateKey(yesterday))}
+        </button>
+        <button className="h-10 shrink-0 rounded-full bg-[rgb(var(--module-accent))] px-4 text-sm font-semibold text-[rgb(var(--bg))]" type="button" onClick={() => onSelectDate(selectedDate)}>
+          {label}
+        </button>
+        <button className="flex h-10 shrink-0 items-center gap-1 rounded-full bg-[rgba(var(--module-accent),0.08)] px-3 text-xs text-[rgb(var(--muted))]" type="button" onClick={() => onSelectDate(tomorrow)}>
+          {formatDateKey(dateKey(tomorrow))} <ChevronRight size={15} />
+        </button>
+        <button className="grid size-10 shrink-0 place-items-center rounded-full glass" type="button" onClick={() => onSelectDate(DateTimeService.todayDate())} aria-label="Ir a hoy">
+          <CalendarDays size={18} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -414,7 +695,7 @@ function ListScreen({
                     <p className="truncate text-sm font-semibold">{exercise.name}</p>
                     <ProgressDot value={exerciseProgress(exercise)} />
                   </div>
-                  <p className="mt-1 text-xs text-white/45">{exercise.sets.length} series Â· {exercise.sets[0]?.reps ?? 0} reps Â· RIR {exercise.sets[0]?.rir ?? 2} Â· {exercise.sets[0]?.restSeconds ?? 90}s</p>
+                  <p className="mt-1 text-xs text-white/45">{exercise.sets.length} series Ã‚Â· {exercise.sets[0]?.reps ?? 0} reps Ã‚Â· RIR {exercise.sets[0]?.rir ?? 2} Ã‚Â· {exercise.sets[0]?.restSeconds ?? 90}s</p>
                   <p className="mt-1 text-xs text-white/35">Ultimo peso: {exercise.sets[0]?.weight ?? 0} kg</p>
                 </div>
                 <GripVertical className="text-white/30" size={16} />
@@ -635,7 +916,7 @@ function HistoryScreen({ exercise, onBack }: { exercise: WorkoutExercise; onBack
         <StatTile label="Fuerza" value="+14%" detail="mensual" />
         <StatTile label="Volumen" value="+9%" detail="semanal" />
       </div>
-      {["12/05/2026 Â· 80 kg x 8, 8, 6", "19/05/2026 Â· 82.5 kg x 8, 7, 6", "26/05/2026 Â· 85 kg x 6, 6, 6"].map((item) => (
+      {["12/05/2026 Ã‚Â· 80 kg x 8, 8, 6", "19/05/2026 Ã‚Â· 82.5 kg x 8, 7, 6", "26/05/2026 Ã‚Â· 85 kg x 6, 6, 6"].map((item) => (
         <div key={item} className="rounded-[18px] border border-white/8 bg-white/[0.045] p-3 text-sm text-white/70">{item}</div>
       ))}
       <section className="rounded-[22px] border border-white/10 bg-white/[0.045] p-4">

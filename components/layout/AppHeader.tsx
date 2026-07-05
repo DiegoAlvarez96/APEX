@@ -7,7 +7,7 @@ import { DateTimeService } from "@/lib/date";
 import type { ViewKey } from "@/components/layout/BottomNav";
 import { getModuleIdentity } from "@/lib/modules";
 
-export function AppHeader({ active, onNavigate, onRefresh, onOpenTrainingSettings }: { active: ViewKey; onNavigate: (view: ViewKey) => void; onRefresh?: () => Promise<void> | void; onOpenTrainingSettings?: () => void }) {
+export function AppHeader({ active, onNavigate, onRefresh }: { active: ViewKey; onNavigate: (view: ViewKey) => void; onRefresh?: () => Promise<void> | void }) {
   const [updateState, setUpdateState] = useState<"idle" | "checking" | "done" | "error">("idle");
   const moduleTheme = getModuleIdentity(active);
 
@@ -58,9 +58,6 @@ export function AppHeader({ active, onNavigate, onRefresh, onOpenTrainingSetting
         </span>
       ) : null}
       <div className="flex gap-2">
-        {active === "training" ? (
-          <button className="grid size-8 place-items-center rounded-full border border-[#d8ff64]/25 bg-[#d8ff64]/12 text-[#d8ff64]" onClick={onOpenTrainingSettings} aria-label="Configurar deportes" type="button"><Settings size={15} /></button>
-        ) : null}
         <button className="grid size-8 place-items-center rounded-full border border-white/10 bg-white/[0.07]" style={{ color: moduleTheme.accent }} onClick={() => onNavigate("alerts")} aria-label="Alertas" type="button"><Bell size={15} /></button>
         <button className="grid size-8 place-items-center rounded-full border border-white/10 bg-white/[0.07] disabled:opacity-60" style={{ color: moduleTheme.accent }} onClick={() => void updateApp()} disabled={updateState === "checking"} aria-label="Actualizar aplicacion" type="button"><RefreshCw size={15} /></button>
         <button className="grid size-8 place-items-center rounded-full border border-white/10 bg-white/[0.07]" style={{ color: getModuleIdentity("chat").accent }} onClick={() => onNavigate("chat")} aria-label="Chat IA" type="button"><Bot size={15} /></button>

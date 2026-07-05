@@ -1,8 +1,9 @@
 "use client";
 
-import { Camera, Check, Copy, Eye, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Beef, Camera, Check, Copy, Droplets, Eye, Flame, Loader2, Pencil, Plus, Search, Sparkles, Trash2, Wheat, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CompactDisclosure } from "@/components/ui/CompactDisclosure";
+import { Card } from "@/components/ui/Card";
 import { DateNavigator } from "@/components/ui/DateNavigator";
 import { InlineStatus, LoadingButton } from "@/components/ui/Loading";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
@@ -80,7 +81,7 @@ export function NutritionSmartView({
         weightKg: nextWeight || undefined,
         dateKey: selectedDateKey
       });
-      setStatus({ message: "Guardado automatico.", tone: "success" });
+      setStatus({ message: "Guardado.", tone: "success" });
     } catch {
       setStatus({ message: "No se pudo guardar nutricion.", tone: "error" });
     } finally {
@@ -319,17 +320,71 @@ export function NutritionSmartView({
     }
   }
 
+  const planDone = planItems.filter((item) => item.done).length;
+  const calorieGoal = Math.max(1800, Math.round((totals.calories || 2200) / 100) * 100);
+  const proteinGoal = weightKg ? Math.max(120, Math.round(weightKg * 2)) : 160;
+  const waterGoal = 3000;
+  const macroStats = [
+    { label: "Kcal", value: Math.round(totals.calories), goal: calorieGoal, icon: Flame },
+    { label: "Proteina", value: Math.round(totals.protein), goal: proteinGoal, icon: Beef },
+    { label: "Carbos", value: Math.round(totals.carbs), goal: 260, icon: Wheat },
+    { label: "Agua", value: Math.round(waterMl / 100) / 10, goal: waterGoal / 1000, icon: Droplets, suffix: "L" }
+  ];
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <DateNavigator title="Nutricion" eyebrow="Plan, comidas y bebidas" selectedDate={selectedDate} onSelectDate={onSelectDate} />
 
-      <CompactDisclosure title="Plan del dia" eyebrow="OpenAI contextual">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <LoadingButton loading={loading === "plan"} loadingLabel="Generando..." className="min-h-10 rounded-2xl bg-white px-3 text-xs font-semibold text-black" onClick={() => void generatePlan()}>Generar plan</LoadingButton>
+
+      <Card className="p-3">
+        <div className="mb-3 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--muted))]">Nuevo</p>
+            <h2 className="text-base font-semibold">Agregar comida</h2>
+          </div>
+          <SegmentedControl value={mode} onChange={setMode} options={[{ value: "text", label: "Nuevo" }, { value: "search", label: "Buscar" }, { value: "photo", label: "Foto" }]} />
+        </div>
+        {mode === "text" ? (
+          <div className="grid gap-2">
+            <textarea className="min-h-24 rounded-[20px] bg-white/[0.08] px-3 py-3 text-sm outline-none light:bg-black/[0.05]" placeholder="Ej: avena, banana, whey o 150 g pollo con arroz..." value={text} onChange={(event) => setText(event.target.value)} />
+            <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
+              {frequentFoods.map((food) => (
+                <button key={food} type="button" className="shrink-0 rounded-full bg-[rgb(var(--module-accent))]/14 px-3 py-1.5 text-xs font-semibold text-[rgb(var(--module-accent))]" onClick={() => void addFood(food)}>
+                  {food}
+                </button>
+              ))}
+            </div>
+            <LoadingButton loading={loading === "food"} loadingLabel="Calculando..." className="apex-action flex h-11 items-center justify-center gap-2 rounded-[18px] font-semibold" onClick={() => void addTextFoods()}><Plus size={15} /> Agregar</LoadingButton>
+          </div>
+        ) : null}
+        {mode === "search" ? (
+          <div className="grid gap-3">
+            <div className="flex items-center gap-2 rounded-[18px] bg-white/[0.08] px-4 py-3 light:bg-black/[0.05]"><Search size={18} /><input className="w-full bg-transparent outline-none" placeholder="Banana, pollo, arroz..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+            <div className="grid gap-2">
+              {suggestions.map((food) => <button key={food.name} className="rounded-[18px] bg-white/[0.06] p-3 text-left text-sm disabled:opacity-60 light:bg-black/[0.04]" disabled={loading === "food"} onClick={() => void addFood(food.name)}>{food.name}</button>)}
+            </div>
+          </div>
+        ) : null}
+        {mode === "photo" ? (
+          <label className="flex min-h-28 w-full cursor-pointer flex-col items-center justify-center rounded-[22px] border border-dashed border-white/20 bg-white/[0.04] light:border-black/15 light:bg-black/[0.03]">
+            <Camera className="mb-2 text-[rgb(var(--module-accent))]" /> Tomar o seleccionar foto
+            <span className="mt-1 text-xs text-white/45 light:text-black/45">{loading === "photo" ? "Analizando imagen..." : "APEX confirma antes de guardar si hay dudas."}</span>
+            <input className="hidden" type="file" accept="image/*" capture="environment" onChange={(event) => void handlePhoto(event.target.files?.[0] ?? null)} />
+          </label>
+        ) : null}
+      </Card>
+
+      <Card className="p-3">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--muted))]">Plan del dia</p>
+            <h2 className="text-base font-semibold">Comidas sugeridas</h2>
+          </div>
+          <LoadingButton loading={loading === "plan"} loadingLabel="Generando..." className="min-h-9 rounded-2xl bg-white/[0.09] px-3 text-xs font-semibold" onClick={() => void generatePlan()}>Generar</LoadingButton>
         </div>
         {(["Desayuno", "Colacion manana", "Almuerzo", "Merienda", "Colacion tarde", "Cena"] as const).map((meal) => (
-          <div key={meal} className="mb-4 last:mb-0">
-            <p className="mb-2 text-sm font-semibold">{meal}</p>
+          <div key={meal} className="mb-3 last:mb-0">
+            <p className="mb-2 text-xs font-semibold text-[rgb(var(--muted))]">{meal}</p>
             <div className="space-y-2">
               {planItems.filter((item) => item.meal === meal).map((item) => {
                 const isRecalculating = recalculatingPlanIds.includes(item.id);
@@ -380,43 +435,7 @@ export function NutritionSmartView({
             </div>
           </div>
         ))}
-      </CompactDisclosure>
-
-      <CompactDisclosure title="Agregar comidas">
-        <div className="-mx-1 -mt-1 mb-2">
-          <SegmentedControl value={mode} onChange={setMode} options={[{ value: "text", label: "Nuevo" }, { value: "search", label: "Buscar" }, { value: "photo", label: "Foto" }]} />
-        </div>
-        {mode === "text" ? (
-          <div className="grid gap-2">
-            <div className="flex items-center gap-2 rounded-xl bg-white/[0.08] px-3 py-2 light:bg-black/[0.05]">
-              <Search size={14} />
-              <input className="w-full bg-transparent text-sm outline-none" placeholder="Buscar o escribir alimento..." value={text} onChange={(event) => setText(event.target.value)} />
-            </div>
-            <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
-              {frequentFoods.map((food) => (
-                <button key={food} type="button" className="shrink-0 rounded-full bg-[rgb(var(--nutrition))]/16 px-3 py-1.5 text-xs font-semibold text-[rgb(var(--nutrition))]" onClick={() => void addFood(food)}>
-                  {food}
-                </button>
-              ))}
-            </div>
-            <textarea className="min-h-20 rounded-xl bg-white/[0.08] px-3 py-2 text-sm outline-none light:bg-black/[0.05]" placeholder="Detalle opcional: 150 gramos de pollo, cafe, alfajor..." value={text} onChange={(event) => setText(event.target.value)} />
-            <LoadingButton loading={loading === "food"} loadingLabel="Calculando..." className="flex h-10 items-center justify-center gap-2 rounded-xl bg-[rgb(var(--nutrition))] font-semibold text-black" onClick={() => void addTextFoods()}><Plus size={15} /> Agregar</LoadingButton>
-          </div>
-        ) : null}
-        {mode === "search" ? (
-          <div className="grid gap-3">
-            <div className="flex items-center gap-2 rounded-2xl bg-white/[0.08] px-4 py-3 light:bg-black/[0.05]"><Search size={18} /><input className="w-full bg-transparent outline-none" placeholder="Ban..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
-            {suggestions.map((food) => <button key={food.name} className="rounded-2xl bg-white/[0.06] p-3 text-left text-sm disabled:opacity-60 light:bg-black/[0.04]" disabled={loading === "food"} onClick={() => void addFood(food.name)}>{food.name}</button>)}
-          </div>
-        ) : null}
-        {mode === "photo" ? (
-          <label className="flex min-h-28 w-full cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed border-white/20 bg-white/[0.04] light:border-black/15 light:bg-black/[0.03]">
-            <Camera className="mb-2 text-[rgb(var(--module-accent))]" /> Tomar o seleccionar foto
-            <span className="mt-1 text-xs text-white/45 light:text-black/45">{loading === "photo" ? "Analizando imagen..." : "Si hay duda, APEX pide confirmacion antes de guardar."}</span>
-            <input className="hidden" type="file" accept="image/*" capture="environment" onChange={(event) => void handlePhoto(event.target.files?.[0] ?? null)} />
-          </label>
-        ) : null}
-      </CompactDisclosure>
+      </Card>
 
       <CompactDisclosure title="Bebidas" eyebrow={`${(waterMl / 1000).toFixed(1)} L agua`}>
         <div className="grid grid-cols-[1fr_1fr_0.8fr_auto] gap-2">
@@ -478,16 +497,34 @@ export function NutritionSmartView({
         {selectedFood ? <FoodDetail food={selectedFood} editing={editingFood?.id === selectedFood.id} onEdit={() => setEditingFood(selectedFood)} onCancel={() => setEditingFood(undefined)} onChange={setEditingFood} draft={editingFood ?? selectedFood} onSave={(food) => void updateFood(food)} /> : null}
       </CompactDisclosure>
 
-      <CompactDisclosure title="Dashboard del dia" eyebrow={`${Math.round(totals.calories)} kcal`}>
-        <div className="grid grid-cols-2 gap-3">
-          <Metric label="Calorias" detail="Plan completado, extras y bebidas." value={`${Math.round(totals.calories)} kcal`} />
-          <Metric label="Proteinas" detail="Proteina total del dia." value={`${Math.round(totals.protein)} g`} />
-          <Metric label="Carbohidratos" detail="Carbos de plan, extras y bebidas." value={`${Math.round(totals.carbs)} g`} />
-          <Metric label="Grasas" detail="Grasas totales registradas." value={`${Math.round(totals.fat)} g`} />
-          <Metric label="Fibra" detail="Fibra estimada total." value={`${Math.round(totals.fiber ?? 0)} g`} />
-          <Metric label="Agua" detail="Agua registrada y convertida a ml." value={`${(waterMl / 1000).toFixed(1)} L`} />
+      <Card className="overflow-hidden p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--muted))]">Nutricion</p>
+            <h2 className="mt-1 text-2xl font-semibold">Resumen del dia</h2>
+            <p className="mt-1 text-xs leading-5 text-[rgb(var(--muted))]">{planDone}/{planItems.length || 0} comidas del plan hechas · {meals.length} extras</p>
+          </div>
+          <span className="apex-icon size-11 shrink-0 rounded-2xl">
+            <Sparkles size={19} />
+          </span>
         </div>
-      </CompactDisclosure>
+        <div className="mt-4 grid grid-cols-4 gap-2">
+          {macroStats.map((item) => {
+            const Icon = item.icon;
+            const pct = Math.min(100, Math.round((Number(item.value) / Math.max(Number(item.goal), 1)) * 100));
+            return (
+              <div key={item.label} className="rounded-[18px] bg-white/[0.055] p-2.5 ring-1 ring-white/8">
+                <Icon className="mb-2 text-[rgb(var(--module-accent))]" size={15} />
+                <p className="text-[10px] text-[rgb(var(--muted))]">{item.label}</p>
+                <p className="mt-1 truncate text-sm font-bold">{item.value}{item.suffix ?? ""}</p>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-[rgb(var(--module-accent))]" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
 
       {visionConfirm ? (
         <div className="fixed inset-0 z-[70] grid place-items-end bg-black/60 p-4 sm:place-items-center">
@@ -608,10 +645,6 @@ function FoodDetail({
       )}
     </div>
   );
-}
-
-function Metric({ label, detail, value }: { label: string; detail: string; value: string }) {
-  return <div className="rounded-2xl bg-white/[0.06] p-3 light:bg-black/[0.04]"><p className="text-xs text-white/45 light:text-black/45">{label}</p><p className="text-lg font-semibold">{value}</p><p className="mt-1 text-[11px] leading-4 text-white/40 light:text-black/40">{detail}</p></div>;
 }
 
 function buildFrequentFoods(meals: FoodEntry[], query: string) {

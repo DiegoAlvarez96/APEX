@@ -8,6 +8,13 @@ import { defaultSportProfile, isAdvancedSport, sportAccentFor, sportCategoryLabe
 import type { SportGoal, SportMode, SportProfile, SportSchedule } from "@/types/apex";
 
 type DraftSport = Omit<SportProfile, "id" | "createdAt" | "updatedAt">;
+type ScheduleGroup = {
+  id: string;
+  startTime: string;
+  endTime: string;
+  type: SportSchedule["type"];
+  weekdays: number[];
+};
 
 export function SportSettingsPanel({
   sports,
@@ -15,7 +22,8 @@ export function SportSettingsPanel({
   onUpdate,
   onDelete,
   onDuplicate,
-  onOpenAgenda
+  onOpenAgenda,
+  onClose
 }: {
   sports: SportProfile[];
   onAdd: (profile: DraftSport) => Promise<void> | void;
@@ -23,6 +31,7 @@ export function SportSettingsPanel({
   onDelete: (id: number, mode: "future" | "all") => Promise<void> | void;
   onDuplicate: (profile: SportProfile) => Promise<void> | void;
   onOpenAgenda?: () => void;
+  onClose?: () => void;
 }) {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editing, setEditing] = useState<SportProfile | null>(null);
@@ -39,15 +48,18 @@ export function SportSettingsPanel({
   }
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
+    <section className="mx-auto max-w-xl space-y-3">
+      <div className="sticky top-0 z-10 -mx-3 flex items-center justify-between gap-3 bg-[#0d0d0d]/88 px-3 py-2 backdrop-blur-xl">
         <div>
           <p className="text-xs text-[rgb(var(--muted))]">Configuracion de deportes</p>
           <h2 className="text-xl font-semibold">Mis deportes y entrenamientos</h2>
         </div>
-        <button type="button" onClick={openCreate} className="flex h-11 shrink-0 items-center gap-2 rounded-2xl bg-[#d8ff64] px-4 text-sm font-bold text-black">
-          <Plus size={17} /> Agregar
-        </button>
+        <div className="flex gap-2">
+          <button type="button" onClick={openCreate} className="flex h-11 shrink-0 items-center gap-2 rounded-2xl bg-[#d8ff64] px-4 text-sm font-bold text-black">
+            <Plus size={17} /> Agregar
+          </button>
+          {onClose ? <button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-2xl bg-white/8"><X size={17} /></button> : null}
+        </div>
       </div>
 
       {sports.length ? (
@@ -88,7 +100,7 @@ export function SportSettingsPanel({
 
       <AnimatePresence>
         {deleteTarget ? (
-          <motion.div className="fixed inset-0 z-[90] grid place-items-center bg-black/65 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div className="fixed inset-0 z-[120] grid place-items-center bg-black/65 px-5 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.div initial={{ scale: 0.96, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.96, y: 12 }} className="w-full max-w-sm rounded-[24px] border border-white/12 bg-[#17181c] p-5">
               <h3 className="text-lg font-bold">Eliminar configuracion</h3>
               <p className="mt-2 text-sm leading-6 text-white/58">Queres eliminar solo los proximos eventos o tambien el historial de {deleteTarget.name}?</p>
@@ -149,21 +161,43 @@ function SportWizard({ initial, onClose, onSave }: { initial: SportProfile | nul
   const specs = selectedCategory.options;
   const needsCustom = draft.category === "other" || draft.specification === "Otro";
   const canContinue = step !== 1 || Boolean(draft.specification && draft.name);
+  const scheduleGroups = buildScheduleGroups(draft.schedules);
 
   function patch(next: Partial<DraftSport>) {
     setDraft((current) => ({ ...current, ...next }));
   }
 
-  function addSchedule() {
+  function addScheduleGroup() {
     patch({ schedules: [...draft.schedules, { id: DateTimeService.id("sport-schedule"), weekday: 1, startTime: "19:00", endTime: "20:30", type: "training" }] });
   }
 
-  function updateSchedule(id: string, next: Partial<SportSchedule>) {
-    patch({ schedules: draft.schedules.map((item) => item.id === id ? { ...item, ...next } : item) });
+  function updateScheduleGroup(group: ScheduleGroup, next: Partial<Pick<SportSchedule, "startTime" | "endTime" | "type">>) {
+    patch({
+      schedules: draft.schedules.map((item) =>
+        group.weekdays.includes(item.weekday) && item.startTime === group.startTime && item.endTime === group.endTime && item.type === group.type
+          ? { ...item, ...next }
+          : item
+      )
+    });
+  }
+
+  function toggleScheduleDay(group: ScheduleGroup, weekday: number) {
+    const exists = group.weekdays.includes(weekday);
+    if (exists && group.weekdays.length === 1) return;
+    if (exists) {
+      patch({ schedules: draft.schedules.filter((item) => !(item.weekday === weekday && item.startTime === group.startTime && item.endTime === group.endTime && item.type === group.type)) });
+      return;
+    }
+    patch({
+      schedules: [
+        ...draft.schedules,
+        { id: DateTimeService.id("sport-schedule"), weekday, startTime: group.startTime, endTime: group.endTime, type: group.type }
+      ]
+    });
   }
 
   return (
-    <motion.div className="fixed inset-0 z-[80] overflow-y-auto bg-[#0d0d0d] px-3 pb-6 pt-[calc(env(safe-area-inset-top)+12px)]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <motion.div className="fixed inset-0 z-[110] overflow-y-auto bg-[#0d0d0d] px-3 pb-6 pt-[calc(env(safe-area-inset-top)+12px)]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <header className="sticky top-0 z-10 -mx-3 mb-3 flex items-center justify-between bg-[#0d0d0d]/85 px-3 py-2 backdrop-blur-xl">
         <div>
           <p className="text-xs text-white/45">Paso {step} de 4</p>
@@ -205,10 +239,10 @@ function SportWizard({ initial, onClose, onSave }: { initial: SportProfile | nul
             <Segmented value={draft.hasFixedSchedule ? "yes" : "no"} options={[["yes", "Si, agregar horarios"], ["no", "No, manual"]]} onChange={(value) => patch({ hasFixedSchedule: value === "yes" })} />
             {draft.hasFixedSchedule ? (
               <div className="mt-4 space-y-3">
-                {draft.schedules.map((schedule) => (
-                  <ScheduleEditor key={schedule.id} schedule={schedule} onChange={(next) => updateSchedule(schedule.id, next)} />
+                {scheduleGroups.map((group) => (
+                  <ScheduleGroupEditor key={group.id} group={group} onChange={(next) => updateScheduleGroup(group, next)} onToggleDay={(weekday) => toggleScheduleDay(group, weekday)} />
                 ))}
-                <button type="button" onClick={addSchedule} className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.045] font-semibold">+ Agregar otro horario</button>
+                <button type="button" onClick={addScheduleGroup} className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.045] font-semibold">+ Agregar otro horario</button>
               </div>
             ) : null}
           </WizardCard>
@@ -241,21 +275,45 @@ function SportWizard({ initial, onClose, onSave }: { initial: SportProfile | nul
   );
 }
 
-function ScheduleEditor({ schedule, onChange }: { schedule: SportSchedule; onChange: (next: Partial<SportSchedule>) => void }) {
+function ScheduleGroupEditor({ group, onChange, onToggleDay }: { group: ScheduleGroup; onChange: (next: Partial<Pick<SportSchedule, "startTime" | "endTime" | "type">>) => void; onToggleDay: (weekday: number) => void }) {
   return (
-    <div className={`rounded-[20px] border p-3 ${schedule.type === "competition" ? "border-red-400/25 bg-red-500/20" : "border-white/8 bg-white/[0.045]"}`}>
-      <div className="grid grid-cols-2 gap-2">
-        <select className="h-11 rounded-2xl bg-[#17181c] px-3 outline-none" value={schedule.weekday} onChange={(event) => onChange({ weekday: Number(event.target.value) })}>
-          {weekDayLabels.map((label, index) => <option key={label} value={index}>{label}</option>)}
-        </select>
-        <select className="h-11 rounded-2xl bg-[#17181c] px-3 outline-none" value={schedule.type} onChange={(event) => onChange({ type: event.target.value as SportSchedule["type"] })}>
+    <div className={`rounded-[20px] border p-3 ${group.type === "competition" ? "border-red-400/25 bg-red-500/20" : "border-white/8 bg-white/[0.045]"}`}>
+      <div>
+        <p className="mb-2 text-xs font-semibold text-white/45">Dias activos</p>
+        <div className="grid grid-cols-7 gap-1.5">
+          {[
+            [1, "L"],
+            [2, "Ma"],
+            [3, "Mi"],
+            [4, "J"],
+            [5, "V"],
+            [6, "S"],
+            [0, "D"]
+          ].map(([weekday, label]) => {
+            const selected = group.weekdays.includes(Number(weekday));
+            return (
+              <button
+                key={weekday}
+                type="button"
+                onClick={() => onToggleDay(Number(weekday))}
+                className={`grid aspect-square place-items-center rounded-xl border text-xs font-bold ${selected ? "border-[#d8ff64] bg-[#d8ff64] text-black" : "border-white/10 bg-[#17181c] text-white/45"}`}
+                aria-pressed={selected}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="mt-3">
+        <select className="h-11 w-full rounded-2xl bg-[#17181c] px-3 outline-none" value={group.type} onChange={(event) => onChange({ type: event.target.value as SportSchedule["type"] })}>
           <option value="training">Entrenamiento</option>
           <option value="competition">Competicion</option>
         </select>
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2">
-        <TimeWheel label="Inicio" value={schedule.startTime} onChange={(startTime) => onChange({ startTime })} />
-        <TimeWheel label="Fin" value={schedule.endTime} onChange={(endTime) => onChange({ endTime })} />
+        <TimeWheel label="Inicio" value={group.startTime} onChange={(startTime) => onChange({ startTime })} />
+        <TimeWheel label="Fin" value={group.endTime} onChange={(endTime) => onChange({ endTime })} />
       </div>
     </div>
   );
@@ -310,6 +368,30 @@ function goalDescription(goal: SportGoal) {
     amateur: "Mejora de rendimiento, tecnica, volumen, tiempos y progresion.",
     professional: "Planificacion, carga, recuperacion, metricas avanzadas y rendimiento."
   }[goal];
+}
+
+function buildScheduleGroups(schedules: SportSchedule[]): ScheduleGroup[] {
+  const groups = new Map<string, ScheduleGroup>();
+  schedules.forEach((schedule) => {
+    const key = `${schedule.startTime}-${schedule.endTime}-${schedule.type}`;
+    const current = groups.get(key);
+    if (current) {
+      current.weekdays = Array.from(new Set([...current.weekdays, schedule.weekday])).sort((a, b) => dayOrder(a) - dayOrder(b));
+      return;
+    }
+    groups.set(key, {
+      id: key,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      type: schedule.type,
+      weekdays: [schedule.weekday]
+    });
+  });
+  return Array.from(groups.values());
+}
+
+function dayOrder(day: number) {
+  return day === 0 ? 7 : day;
 }
 
 function stripSport(profile: SportProfile): DraftSport {
