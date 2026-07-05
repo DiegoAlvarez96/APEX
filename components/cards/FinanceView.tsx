@@ -194,10 +194,10 @@ export function FinanceView({ selectedDateKey, transactions, rules, paymentMetho
         <h1 className="text-2xl font-semibold tracking-normal">Que gastaste?</h1>
       </header>
 
-      <section className="rounded-[20px] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 shadow-soft">
-        <div className="grid grid-cols-4 gap-1 rounded-2xl bg-[rgb(var(--surface-strong))] p-1">
+      <section className="module-soft-surface rounded-[20px] border p-3 shadow-soft">
+        <div className="grid grid-cols-4 gap-1 rounded-2xl bg-[rgba(var(--module-accent),0.08)] p-1">
           {(["day", "week", "month", "custom"] as const).map((mode) => (
-            <button key={mode} type="button" onClick={() => setRangeMode(mode)} className={`min-h-9 rounded-xl text-xs font-semibold ${rangeMode === mode ? "bg-[rgb(var(--accent))] text-black" : "text-[rgb(var(--muted))]"}`}>
+            <button key={mode} type="button" onClick={() => setRangeMode(mode)} className={`min-h-9 rounded-xl text-xs font-semibold ${rangeMode === mode ? "bg-[rgb(var(--module-accent))] text-[rgb(var(--bg))]" : "text-[rgb(var(--muted))]"}`}>
               {mode === "day" ? "Dia" : mode === "week" ? "Semana" : mode === "month" ? "Mes" : "Pers."}
             </button>
           ))}
@@ -231,9 +231,9 @@ export function FinanceView({ selectedDateKey, transactions, rules, paymentMetho
         ) : null}
       </section>
 
-      <section className="rounded-[20px] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-soft">
+      <section className="module-soft-surface rounded-[20px] border p-4 shadow-soft">
         <div className="flex items-center gap-2 rounded-2xl bg-[rgb(var(--surface-strong))] px-3 py-2.5">
-          <Sparkles size={17} className="shrink-0 text-[rgb(var(--accent))]" />
+          <Sparkles size={17} className="shrink-0 text-[rgb(var(--module-accent))]" />
           <input value={quickText} onChange={(event) => { setQuickText(event.target.value); setManualCategory(false); }} placeholder="Uber 4500,50" className="min-h-9 w-full bg-transparent text-base font-medium outline-none placeholder:text-[rgb(var(--muted))]" autoComplete="off" />
         </div>
 
@@ -302,13 +302,13 @@ export function FinanceView({ selectedDateKey, transactions, rules, paymentMetho
                 <LabeledNumber label="O habil desde mes" value={newPaymentBusinessDay} onChange={setNewPaymentBusinessDay} />
               </div>
             ) : null}
-            <button type="button" onClick={() => void addPaymentMethod()} className="min-h-10 w-full rounded-xl bg-[rgb(var(--accent))] text-sm font-bold text-black">Anadir</button>
+            <button type="button" onClick={() => void addPaymentMethod()} className="min-h-10 w-full rounded-xl bg-[rgb(var(--module-accent))] text-sm font-bold text-[rgb(var(--bg))]">Anadir</button>
           </div>
         ) : null}
 
         <div className="mt-2 flex rounded-2xl bg-[rgb(var(--surface-strong))] p-1">
           {(["expense", "income"] as const).map((item) => (
-            <button key={item} type="button" onClick={() => { setType(item); if (item === "income") setCategory("Ingresos"); }} className={`min-h-9 flex-1 rounded-xl text-sm font-semibold transition ${type === item ? "bg-[rgb(var(--accent))] text-black" : "text-[rgb(var(--muted))]"}`}>
+            <button key={item} type="button" onClick={() => { setType(item); if (item === "income") setCategory("Ingresos"); }} className={`min-h-9 flex-1 rounded-xl text-sm font-semibold transition ${type === item ? "bg-[rgb(var(--module-accent))] text-[rgb(var(--bg))]" : "text-[rgb(var(--muted))]"}`}>
               {item === "expense" ? "Gasto" : "Ingreso"}
             </button>
           ))}
@@ -322,13 +322,13 @@ export function FinanceView({ selectedDateKey, transactions, rules, paymentMetho
         {advancedOpen ? (
           <div className="mt-2 space-y-2 rounded-2xl bg-[rgb(var(--surface-strong))] p-3">
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setInstallmentsOpen((value) => !value)} className={`min-h-10 rounded-xl text-sm font-semibold ${installmentsOpen ? "bg-[rgb(var(--accent))] text-black" : "bg-[rgb(var(--surface))]"}`}>Son cuotas</button>
-              <button type="button" onClick={() => setReimbursementOpen((value) => !value)} className={`min-h-10 rounded-xl text-sm font-semibold ${reimbursementOpen ? "bg-[rgb(var(--accent))] text-black" : "bg-[rgb(var(--surface))]"}`}>Reintegro</button>
+              <button type="button" onClick={() => setInstallmentsOpen((value) => !value)} className={`min-h-10 rounded-xl text-sm font-semibold ${installmentsOpen ? "bg-[rgb(var(--module-accent))] text-[rgb(var(--bg))]" : "bg-[rgb(var(--surface))]"}`}>Son cuotas</button>
+              <button type="button" onClick={() => setReimbursementOpen((value) => !value)} className={`min-h-10 rounded-xl text-sm font-semibold ${reimbursementOpen ? "bg-[rgb(var(--module-accent))] text-[rgb(var(--bg))]" : "bg-[rgb(var(--surface))]"}`}>Reintegro</button>
             </div>
             {installmentsOpen ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-6 gap-1">
-                  {[3, 6, 9, 12, 18].map((item) => <button key={item} type="button" onClick={() => setInstallmentCount(item)} className={`min-h-9 rounded-xl text-xs font-bold ${installmentCount === item ? "bg-[rgb(var(--accent))] text-black" : "bg-[rgb(var(--surface))]"}`}>{item}</button>)}
+                  {[3, 6, 9, 12, 18].map((item) => <button key={item} type="button" onClick={() => setInstallmentCount(item)} className={`min-h-9 rounded-xl text-xs font-bold ${installmentCount === item ? "bg-[rgb(var(--module-accent))] text-[rgb(var(--bg))]" : "bg-[rgb(var(--surface))]"}`}>{item}</button>)}
                   <input value={installmentCount} onChange={(event) => setInstallmentCount(Number(event.target.value) || 1)} type="number" className="rounded-xl bg-[rgb(var(--surface))] px-2 text-center text-xs outline-none" />
                 </div>
                 {selectedPaymentMethod?.kind !== "credit" ? <input value={firstInstallmentDate} onChange={(event) => setFirstInstallmentDate(event.target.value)} type="date" className="w-full rounded-xl bg-[rgb(var(--surface))] px-3 py-2 text-xs outline-none" /> : null}
@@ -364,7 +364,7 @@ export function FinanceView({ selectedDateKey, transactions, rules, paymentMetho
           <p className="min-w-0 text-xs text-[rgb(var(--muted))]">
             {quickText.trim() ? `Sugerido: ${suggestion.category}` : selectedPaymentMethod?.kind === "credit" && cardDates ? `Resumen: ${cardDates.statementDateKey} · Pago: ${cardDates.paymentDateKey}` : "ARS, hoy y Mercado Pago por defecto"}
           </p>
-          <button type="button" onClick={save} disabled={!description.trim() && !quickText.trim()} className="min-h-11 shrink-0 rounded-full bg-[rgb(var(--accent))] px-5 text-sm font-bold text-black transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40">Guardar</button>
+          <button type="button" onClick={save} disabled={!description.trim() && !quickText.trim()} className="min-h-11 shrink-0 rounded-full bg-[rgb(var(--module-accent))] px-5 text-sm font-bold text-[rgb(var(--bg))] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40">Guardar</button>
         </div>
       </section>
 
@@ -374,7 +374,7 @@ export function FinanceView({ selectedDateKey, transactions, rules, paymentMetho
         <FinanceMetric label="Balance" value={formatMoney(summary.balance)} />
       </section>
 
-      <section className="rounded-[18px] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 shadow-soft">
+      <section className="module-soft-surface rounded-[18px] border p-4 shadow-soft">
         <div className="mb-3 flex items-center justify-between"><h2 className="text-base font-semibold">Categorias</h2><span className="text-xs text-[rgb(var(--muted))]">{activeRange.label}</span></div>
         <div className="space-y-2">
           {summary.byCategory.slice(0, 8).map((item) => (

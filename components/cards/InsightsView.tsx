@@ -56,7 +56,7 @@ export function InsightsView({
         <div className="space-y-3">
           {items.map((item) => (
             <div key={`${item.category}-${item.title}`} className="flex gap-3 rounded-2xl bg-white/[0.06] p-3 light:bg-black/[0.04]">
-              <BrainCircuit className="mt-0.5 text-limeglass" size={19} />
+              <BrainCircuit className="mt-0.5 text-[rgb(var(--module-accent))]" size={19} />
               <div>
                 <p className="text-sm font-semibold">{item.title}</p>
                 <p className="text-xs leading-5 text-white/50 light:text-black/50">{item.detail}</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import Dexie, { type Table } from "dexie";
-import type { AgendaNote, ApexAlert, AppSettings, BodyMeasurement, ChatMessage, FinanceCategoryRule, FinancePaymentMethod, FinanceScheduledPayment, FinanceSettings, FinanceTransaction, FoodCacheItem, NutritionLog, Product, ProductConsumption, ProgressPhoto, ShoppingItem, SleepLog, TaskCompletion, Workout, WorkoutTemplate } from "@/types/apex";
+import type { AgendaNote, ApexAlert, AppSettings, BodyMeasurement, ChatMessage, FinanceCategoryRule, FinancePaymentMethod, FinanceScheduledPayment, FinanceSettings, FinanceTransaction, FoodCacheItem, NutritionLog, Product, ProductConsumption, ProgressPhoto, ShoppingItem, SleepLog, SportProfile, TaskCompletion, Workout, WorkoutTemplate } from "@/types/apex";
 
 class ApexDatabase extends Dexie {
   completions!: Table<TaskCompletion, number>;
@@ -23,6 +23,7 @@ class ApexDatabase extends Dexie {
   financeScheduledPayments!: Table<FinanceScheduledPayment, number>;
   financeSettings!: Table<FinanceSettings, string>;
   photos!: Table<ProgressPhoto, number>;
+  sportProfiles!: Table<SportProfile, number>;
   settings!: Table<AppSettings, string>;
 
   constructor() {
@@ -127,6 +128,29 @@ class ApexDatabase extends Dexie {
       financePaymentMethods: "++id, kind, label, updatedAt",
       financeScheduledPayments: "++id, transactionId, dueDateKey, createdAt",
       financeSettings: "id",
+      photos: "++id, zone, createdAt",
+      settings: "id"
+    });
+    this.version(8).stores({
+      completions: "++id, [dateKey+taskId], dateKey, taskId",
+      products: "++id, category, group, name, brand, purchaseDate",
+      productConsumptions: "++id, productId, dateKey, createdAt",
+      alerts: "++id, status, severity, source, productId, dueDateKey, createdAt",
+      nutritionLogs: "++id, &dateKey, createdAt",
+      foodCache: "++id, &key, createdAt",
+      workouts: "++id, dateKey, focus, createdAt",
+      workoutTemplates: "++id, group, source, createdAt, updatedAt",
+      bodyMeasurements: "++id, dateKey, createdAt",
+      shoppingItems: "++id, status, category, source, productId, createdAt",
+      chatMessages: "++id, role, createdAt",
+      agendaNotes: "++id, &dateKey, updatedAt",
+      sleepLogs: "++id, &dateKey, createdAt",
+      financeTransactions: "++id, type, category, currency, dateKey, occurredAt, paymentMethodId, cardPaymentDateKey, createdAt",
+      financeCategoryRules: "++id, &key, category, updatedAt",
+      financePaymentMethods: "++id, kind, label, updatedAt",
+      financeScheduledPayments: "++id, transactionId, dueDateKey, createdAt",
+      financeSettings: "id",
+      sportProfiles: "++id, status, category, mode, updatedAt",
       photos: "++id, zone, createdAt",
       settings: "id"
     });

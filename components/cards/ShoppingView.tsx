@@ -39,7 +39,7 @@ export function ShoppingView({
     <div className="space-y-5">
       <header className="flex items-center justify-between px-1 pt-2">
         <div><p className="text-sm text-white/45 light:text-black/45">Lista inteligente</p><h1 className="text-3xl font-semibold">Compras</h1></div>
-        <LoadingButton loading={loading} loadingLabel="" className="grid size-11 place-items-center rounded-full bg-limeglass text-black" onClick={() => void sync()}><RefreshCw size={18} /></LoadingButton>
+        <LoadingButton loading={loading} loadingLabel="" className="grid size-11 place-items-center rounded-full bg-[rgb(var(--module-accent))] text-[rgb(var(--bg))]" onClick={() => void sync()}><RefreshCw size={18} /></LoadingButton>
       </header>
       <InlineStatus message={status.message} tone={status.tone} />
 
@@ -77,7 +77,7 @@ export function ShoppingView({
                     <p className="mt-1 text-xs text-white/45 light:text-black/45">{section} - Marca sugerida: {template?.brand ?? "A definir"}</p>
                     <p className="mt-1 text-xs leading-5 text-white/45 light:text-black/45">{reasonFor(section, title)}</p>
                   </div>
-                  <Sparkles className="text-limeglass" size={18} />
+                  <Sparkles className="text-[rgb(var(--module-accent))]" size={18} />
                 </div>
                 <a className="mt-3 flex h-10 items-center justify-center gap-2 rounded-2xl bg-white text-sm font-semibold text-black" href={`https://www.mercadolibre.com.ar/jm/search?as_word=${encodeURIComponent(title)}`} target="_blank">
                   <ExternalLink size={15} /> Comprar

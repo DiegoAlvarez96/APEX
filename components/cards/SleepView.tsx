@@ -45,14 +45,14 @@ export function SleepView({ sleep, onSave }: { sleep?: SleepLog; onSave: (sleepT
             <input className="mt-2 w-full bg-transparent text-3xl font-semibold outline-none" type="time" value={wakeTime} onChange={(event) => setWakeTime(event.target.value)} />
           </label>
         </div>
-        <div className="mt-4 flex items-center gap-3 rounded-3xl bg-limeglass/15 p-4">
-          <Moon className="text-limeglass light:text-black" />
+        <div className="mt-4 flex items-center gap-3 rounded-3xl bg-[rgba(var(--module-accent),0.15)] p-4">
+          <Moon className="text-[rgb(var(--module-accent))]" />
           <div>
             <p className="text-sm text-white/50 light:text-black/50">Duracion calculada</p>
             <p className="text-2xl font-semibold">{formatSleepDuration(duration)}</p>
           </div>
         </div>
-        <LoadingButton loading={loading} loadingLabel="Guardando..." className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" onClick={() => void save()}>
+        <LoadingButton loading={loading} loadingLabel="Guardando..." className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[rgb(var(--module-accent))] font-semibold text-[rgb(var(--bg))]" onClick={() => void save()}>
           <Save size={18} /> Guardar sueno
         </LoadingButton>
         <div className="mt-3"><InlineStatus message={status.message} tone={status.tone} /></div>

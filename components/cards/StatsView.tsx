@@ -40,7 +40,7 @@ export function StatsView({ completions }: { completions: TaskCompletion[] }) {
             return (
               <div key={dateKey(day)} className="flex flex-1 flex-col items-center gap-2">
                 <div className="flex h-28 w-full items-end rounded-full bg-white/[0.06] p-1 light:bg-black/[0.04]">
-                  <div className="w-full rounded-full bg-limeglass" style={{ height: `${height}%` }} />
+                  <div className="w-full rounded-full bg-[rgb(var(--module-accent))]" style={{ height: `${height}%` }} />
                 </div>
                 <span className="text-[10px] text-white/45 light:text-black/45">{shortWeekday(day)}</span>
               </div>
@@ -55,7 +55,7 @@ export function StatsView({ completions }: { completions: TaskCompletion[] }) {
 function Metric({ icon: Icon, label, value }: { icon: typeof TrendingUp; label: string; value: string }) {
   return (
     <Card className="p-4">
-      <Icon className="mb-4 text-limeglass" size={22} />
+      <Icon className="mb-4 text-[rgb(var(--module-accent))]" size={22} />
       <p className="text-xs text-white/45 light:text-black/45">{label}</p>
       <p className="mt-1 text-2xl font-semibold">{value}</p>
     </Card>

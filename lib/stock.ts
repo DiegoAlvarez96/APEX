@@ -52,7 +52,7 @@ export function stockStatus(percent: number): ProductStockSummary["status"] {
 
 export function stockColor(status: ProductStockSummary["status"]) {
   return {
-    ok: "bg-limeglass",
+    ok: "bg-[rgb(var(--module-accent))]",
     low: "bg-yellow-300",
     warning: "bg-orange-400",
     critical: "bg-red-500"

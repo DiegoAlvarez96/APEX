@@ -22,7 +22,7 @@ export function AlertsView({
           <p className="text-sm text-white/45 light:text-black/45">Centro de alertas</p>
           <h1 className="text-3xl font-semibold">Alertas</h1>
         </div>
-        <button className="grid size-11 place-items-center rounded-full bg-limeglass text-black" onClick={onSyncStockAlerts} type="button" aria-label="Actualizar alertas">
+        <button className="grid size-11 place-items-center rounded-full bg-[rgb(var(--module-accent))] text-[rgb(var(--bg))]" onClick={onSyncStockAlerts} type="button" aria-label="Actualizar alertas">
           <Bell size={18} />
         </button>
       </header>

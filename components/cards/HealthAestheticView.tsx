@@ -26,7 +26,7 @@ export function HealthAestheticView() {
                       <p className="mt-1 text-xs text-white/45 light:text-black/45">Marca sugerida: {template?.brand ?? "A definir"}</p>
                       <p className="mt-1 text-xs leading-5 text-white/45 light:text-black/45">{reasonFor(section.section, title)}</p>
                     </div>
-                    <Sparkles className="text-limeglass" size={18} />
+                    <Sparkles className="text-[rgb(var(--module-accent))]" size={18} />
                   </div>
                   <a className="mt-3 flex h-10 items-center justify-center gap-2 rounded-2xl bg-white text-sm font-semibold text-black" href={`https://www.mercadolibre.com.ar/jm/search?as_word=${encodeURIComponent(title)}`} target="_blank">
                     <ExternalLink size={15} /> Comprar

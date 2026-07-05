@@ -16,6 +16,7 @@ const SYNC_COLLECTIONS = [
   "chatMessages",
   "agendaNotes",
   "sleepLogs",
+  "sportProfiles",
   "photos",
   "settings"
 ] as const;

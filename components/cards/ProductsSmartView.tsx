@@ -172,7 +172,7 @@ export function ProductsSmartView({
               <input className="mt-1 w-full bg-transparent outline-none" type="number" placeholder="Consumo diario estimado" {...register("dailyConsumptionEstimate")} />
             </HelpField>
           </div>
-          <LoadingButton loading={loading === "save"} loadingLabel="Guardando..." className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" type="submit">
+          <LoadingButton loading={loading === "save"} loadingLabel="Guardando..." className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[rgb(var(--module-accent))] font-semibold text-[rgb(var(--bg))]" type="submit">
             <PackagePlus size={18} /> Guardar producto
           </LoadingButton>
           <InlineStatus message={loading === "image" ? "Analizando imagen..." : status.message} tone={status.tone} />

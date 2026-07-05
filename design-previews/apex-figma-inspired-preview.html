@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>APEX Front Preview</title>
+  <style>
+    :root {
+      --bg: #07080d;
+      --phone: #0b0c12;
+      --surface: rgba(255,255,255,.055);
+      --surface-2: rgba(255,255,255,.085);
+      --line: rgba(255,255,255,.105);
+      --text: #f7f7fb;
+      --muted: rgba(247,247,251,.54);
+      --nutrition: #9ddfb2;
+      --training: #d7f77a;
+      --agenda: #8ac7ff;
+      --tasks: #b6d8ff;
+      --finance: #7edfc2;
+      --ai: #c7a8ff;
+      --health: #8fe7e2;
+      --habits: #ffd08a;
+      --sleep: #a99bff;
+      --danger: #ff8c93;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 12% 20%, rgba(84,92,255,.16), transparent 28%),
+        radial-gradient(circle at 86% 72%, rgba(255,178,136,.13), transparent 26%),
+        #05060a;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .board {
+      width: max-content;
+      padding: 40px;
+    }
+    .titlebar {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      margin: 0 0 22px;
+      max-width: 1640px;
+    }
+    .titlebar h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+    .titlebar p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .screens {
+      display: grid;
+      grid-template-columns: repeat(5, 390px);
+      gap: 28px;
+      align-items: start;
+    }
+    .phone {
+      position: relative;
+      width: 390px;
+      height: 844px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 42px;
+      background:
+        radial-gradient(circle at 50% -6%, var(--glow, rgba(138,199,255,.14)), transparent 34%),
+        linear-gradient(180deg, rgba(255,255,255,.035), transparent 26%),
+        var(--phone);
+      box-shadow: 0 28px 90px rgba(0,0,0,.48), inset 0 0 0 1px rgba(255,255,255,.04);
+      padding: 22px 22px 92px;
+    }
+    .phone::before {
+      content: "";
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      width: 108px;
+      height: 24px;
+      transform: translateX(-50%);
+      border-radius: 0 0 18px 18px;
+      background: #05060a;
+      z-index: 10;
+    }
+    .status {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 26px;
+      font-size: 12px;
+      font-weight: 700;
+      color: rgba(255,255,255,.8);
+    }
+    .header {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 18px;
+      gap: 14px;
+    }
+    .eyebrow {
+      margin: 0;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .14em;
+    }
+    h2 {
+      margin: 3px 0 0;
+      font-size: 25px;
+      line-height: 1.04;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+    .icon-button, .module-icon {
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255,255,255,.13);
+      background: rgba(255,255,255,.07);
+      backdrop-filter: blur(20px);
+      color: var(--tone);
+    }
+    .icon-button {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+    }
+    .module-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 18px;
+      box-shadow: 0 12px 28px color-mix(in srgb, var(--tone) 16%, transparent);
+      background:
+        radial-gradient(circle at 32% 22%, rgba(255,255,255,.22), transparent 25%),
+        color-mix(in srgb, var(--tone) 16%, rgba(255,255,255,.04));
+    }
+    svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at 15% 0%, color-mix(in srgb, var(--tone, #8ac7ff) 10%, transparent), transparent 34%),
+        var(--surface);
+      box-shadow: 0 16px 46px rgba(0,0,0,.2);
+    }
+    .insight {
+      margin-top: 22px;
+      padding: 16px;
+      background:
+        radial-gradient(circle at 0 0, rgba(255,255,255,.18), transparent 34%),
+        linear-gradient(135deg, rgba(139,116,255,.86), rgba(74,64,210,.86));
+      border: 0;
+    }
+    .insight .row { align-items: start; }
+    .insight p:last-child {
+      margin: 8px 0 0;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .activity {
+      margin-top: 14px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 16px;
+      align-items: center;
+    }
+    .rings {
+      width: 82px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle, #0b0c12 38%, transparent 39%),
+        conic-gradient(var(--danger) 0 295deg, rgba(255,255,255,.08) 295deg),
+        conic-gradient(from 8deg, var(--finance) 0 260deg, transparent 260deg),
+        conic-gradient(from 18deg, var(--agenda) 0 315deg, transparent 315deg);
+      box-shadow: inset 0 0 0 8px rgba(255,255,255,.03);
+    }
+    .metric-line {
+      display: grid;
+      grid-template-columns: 60px 1fr 48px;
+      gap: 8px;
+      align-items: center;
+      margin: 9px 0;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .bar {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.09);
+      overflow: hidden;
+    }
+    .bar span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--tone);
+    }
+    .stats {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .stat {
+      min-height: 92px;
+      padding: 13px;
+    }
+    .stat strong {
+      display: block;
+      margin-top: 13px;
+      color: var(--tone);
+      font-size: 18px;
+    }
+    .stat span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 20px 0 10px;
+    }
+    .section-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .agenda-list {
+      overflow: hidden;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.045);
+    }
+    .agenda-item {
+      display: grid;
+      grid-template-columns: 48px 4px 34px 1fr 16px;
+      gap: 11px;
+      align-items: center;
+      min-height: 64px;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .agenda-item:last-child { border-bottom: 0; }
+    .time {
+      color: var(--muted);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+    .stripe {
+      width: 4px;
+      height: 38px;
+      border-radius: 999px;
+      background: var(--tone);
+    }
+    .agenda-item b {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .agenda-item small {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .nav {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      align-items: center;
+      height: 62px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 25px;
+      background: rgba(12,13,20,.72);
+      backdrop-filter: blur(26px);
+      padding: 6px;
+    }
+    .nav span {
+      display: grid;
+      place-items: center;
+      gap: 3px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .nav .active {
+      color: var(--tone);
+      background: color-mix(in srgb, var(--tone) 13%, transparent);
+      border-radius: 17px;
+      height: 50px;
+    }
+    .radial {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 52% 42%, rgba(255,255,255,.06), transparent 32%),
+        rgba(4,5,9,.78);
+      backdrop-filter: blur(22px);
+    }
+    .radial-panel {
+      position: relative;
+      width: 322px;
+      height: 322px;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 32px;
+      background:
+        radial-gradient(circle at 22% 74%, rgba(244,168,212,.18), transparent 27%),
+        radial-gradient(circle at 80% 22%, rgba(138,199,255,.16), transparent 28%),
+        rgba(255,255,255,.045);
+    }
+    .radial .node {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      gap: 5px;
+      width: 72px;
+      color: white;
+      font-size: 10px;
+      font-weight: 800;
+      text-align: center;
+    }
+    .node .module-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+    }
+    .center-close {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.45);
+      display: grid;
+      place-items: center;
+      background: rgba(0,0,0,.34);
+      font-size: 24px;
+    }
+    .module-grid {
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .module-card {
+      min-height: 112px;
+      padding: 14px;
+    }
+    .module-card b {
+      display: block;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+    .module-card small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      margin-top: 20px;
+      padding: 4px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.07);
+    }
+    .segmented span {
+      height: 35px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .segmented .on {
+      color: #07100b;
+      background: var(--tone);
+    }
+    .food-card, .workout-card, .task-card {
+      margin-top: 13px;
+      padding: 14px;
+    }
+    .macro-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .macro {
+      border-radius: 16px;
+      padding: 11px;
+      background: rgba(255,255,255,.055);
+    }
+    .macro strong {
+      display: block;
+      color: var(--tone);
+      font-size: 18px;
+    }
+    .list-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 48px;
+      border-top: 1px solid rgba(255,255,255,.06);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .list-row:first-of-type { border-top: 0; }
+    .cta {
+      height: 46px;
+      margin-top: 14px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      background: var(--tone);
+      color: #08100d;
+      font-weight: 900;
+      font-size: 13px;
+    }
+    .task-split {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .mini-list {
+      padding: 12px;
+      min-height: 302px;
+    }
+    .mini-list h3 {
+      margin-bottom: 10px;
+      color: var(--tone);
+    }
+    .pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 8px;
+      margin-top: 8px;
+      border-radius: 15px;
+      background: rgba(255,255,255,.06);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--tone);
+      flex: none;
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <div class="titlebar">
+      <div>
+        <h1>APEX · propuesta visual basada en Figma</h1>
+        <p>Dirección: oscuro premium, cards compactas, acentos pastel por módulo, iconografía outline consistente.</p>
+      </div>
+    </div>
+    <section class="screens">
+      <article class="phone" style="--glow: rgba(138,199,255,.14); --tone: var(--agenda)">
+        <div class="status"><span>9:41</span><span>LTE  84%</span></div>
+        <header class="header">
+          <div>
+            <p class="eyebrow">viernes, 4 julio · 2026</p>
+            <h2>Buenas tardes, Diego.</h2>
+          </div>
+          <span class="icon-button" style="--tone: var(--agenda)">
+            <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
+          </span>
+        </header>
+        <section class="card insight">
+          <div class="row" style="display:flex; gap:12px;">
+            <span class="module-icon" style="--tone: var(--ai); width:36px; height:36px; border-radius:14px;">
+              <svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>
+            </span>
+            <div>
+              <p class="eyebrow">APEX · insight de hoy</p>
+              <p>Movi el almuerzo a 11:30 antes del entreno. Cena liviana, objetivo de proteina en curso.</p>
+            </div>
+          </div>
+        </section>
+        <section class="card activity">
+          <div class="rings"></div>
+          <div>
+            <div class="metric-line" style="--tone: var(--danger)"><b>MOVE</b><div class="bar"><span style="width:82%"></span></div><span>624 kcal</span></div>
+            <div class="metric-line" style="--tone: var(--finance)"><b>GYM</b><div class="bar"><span style="width:68%"></span></div><span>32 min</span></div>
+            <div class="metric-line" style="--tone: var(--agenda)"><b>DIA</b><div class="bar"><span style="width:76%"></span></div><span>9 hs</span></div>
+          </div>
+        </section>
+        <section class="stats">
+          <div class="card stat" style="--tone: var(--nutrition)"><svg viewBox="0 0 24 24"><path d="M4 3v7a4 4 0 0 0 8 0V3"/><path d="M8 3v18"/><path d="M20 3v18"/><path d="M16 3h4v9h-4z"/></svg><strong>1.840</strong><span>Calorias</span></div>
+          <div class="card stat" style="--tone: var(--habits)"><svg viewBox="0 0 24 24"><path d="M8 14a4 4 0 1 0 8 0c0-4-4-6-4-10-2 2-4 4-4 10z"/></svg><strong>12</strong><span>Racha</span></div>
+          <div class="card stat" style="--tone: var(--finance)"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><strong>+$340</strong><span>Neto</span></div>
+        </section>
+        <div class="section-head"><p>TODAY'S AGENDA</p><p>3 / 10</p></div>
+        <section class="agenda-list">
+          <div class="agenda-item" style="--tone: var(--health)"><span class="time">07:00</span><span class="stripe"></span><span class="module-icon" style="width:34px;height:34px;border-radius:13px"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-11a5 5 0 0 0-9-3 5 5 0 0 0-9 3c0 7 10 11 10 11z"/></svg></span><span><b>Rutina facial</b><small>Cleanser · vitamina C · SPF</small></span><span>✓</span></div>
+          <div class="agenda-item" style="--tone: var(--nutrition)"><span class="time">07:30</span><span class="stripe"></span><span class="module-icon" style="width:34px;height:34px;border-radius:13px"><svg viewBox="0 0 24 24"><path d="M4 3v7a4 4 0 0 0 8 0V3"/><path d="M8 3v18"/></svg></span><span><b>Desayuno</b><small>Avena, banana, whey · 520 kcal</small></span><span>✓</span></div>
+          <div class="agenda-item" style="--tone: var(--training)"><span class="time">14:00</span><span class="stripe"></span><span class="module-icon" style="width:34px;height:34px;border-radius:13px"><svg viewBox="0 0 24 24"><path d="M6 7v10"/><path d="M18 7v10"/><path d="M3 9v6"/><path d="M21 9v6"/><path d="M6 12h12"/></svg></span><span><b>Upper Body</b><small>4 ejercicios · 45 min</small></span><span>○</span></div>
+        </section>
+        <nav class="nav" style="--tone: var(--agenda)"><span class="active">Hoy</span><span>Explorar</span><span>IA</span><span>Perfil</span></nav>
+      </article>
+
+      <article class="phone" style="--glow: rgba(199,168,255,.16); --tone: var(--ai)">
+        <div class="status"><span>9:41</span><span>LTE  84%</span></div>
+        <div class="radial">
+          <div class="radial-panel">
+            <p class="eyebrow" style="position:absolute;left:20px;top:18px;">APEX · menu</p>
+            <div class="node" style="left:125px;top:34px;--tone:var(--nutrition)"><span class="module-icon"><svg viewBox="0 0 24 24"><path d="M4 3v7a4 4 0 0 0 8 0V3"/><path d="M8 3v18"/></svg></span>Nutri</div>
+            <div class="node" style="left:218px;top:86px;--tone:var(--agenda)"><span class="module-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></span>Agenda</div>
+            <div class="node" style="left:218px;top:190px;--tone:var(--finance)"><span class="module-icon"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg></span>Gastos</div>
+            <div class="node" style="left:125px;top:238px;--tone:var(--tasks)"><span class="module-icon"><svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><path d="M4 7h16M4 17h16"/></svg></span>Tareas</div>
+            <div class="node" style="left:31px;top:190px;--tone:var(--health)"><span class="module-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>Fisico</div>
+            <div class="node" style="left:31px;top:86px;--tone:var(--training)"><span class="module-icon"><svg viewBox="0 0 24 24"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg></span>Gym</div>
+            <div class="center-close">×</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="phone" style="--glow: rgba(157,223,178,.16); --tone: var(--nutrition)">
+        <div class="status"><span>9:41</span><span>LTE  84%</span></div>
+        <header class="header"><div><p class="eyebrow">Nutricion</p><h2>Plan de hoy</h2></div><span class="icon-button"><svg viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M12 4v16"/></svg></span></header>
+        <div class="segmented"><span class="on">Nuevo</span><span>Lista</span><span>Foto</span></div>
+        <section class="card food-card">
+          <p class="eyebrow">recomendado</p>
+          <h3>Agregar comida rapido</h3>
+          <div class="macro-row">
+            <div class="macro"><strong>1.840</strong><small>kcal</small></div>
+            <div class="macro"><strong>128g</strong><small>proteina</small></div>
+            <div class="macro"><strong>2.1L</strong><small>agua</small></div>
+          </div>
+          <div class="cta">Agregar alimento</div>
+        </section>
+        <section class="card food-card">
+          <h3>Comidas del dia</h3>
+          <div class="list-row"><span>Desayuno · avena, banana, whey</span><b>520</b></div>
+          <div class="list-row"><span>Almuerzo · wrap de pavo</span><b>540</b></div>
+          <div class="list-row"><span>Cena · salmon bowl</span><b>640</b></div>
+        </section>
+        <nav class="nav" style="--tone: var(--nutrition)"><span>Hoy</span><span class="active">Nutri</span><span>IA</span><span>Perfil</span></nav>
+      </article>
+
+      <article class="phone" style="--glow: rgba(215,247,122,.15); --tone: var(--training)">
+        <div class="status"><span>9:41</span><span>LTE  84%</span></div>
+        <header class="header"><div><p class="eyebrow">Entrenamiento</p><h2>Upper Body</h2></div><span class="icon-button"><svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9z"/></svg></span></header>
+        <section class="card workout-card">
+          <p class="eyebrow">dia 3 de 5</p>
+          <h3>4 ejercicios · 45 min</h3>
+          <div class="macro-row">
+            <div class="macro"><strong>2/4</strong><small>hechos</small></div>
+            <div class="macro"><strong>12.4k</strong><small>volumen</small></div>
+            <div class="macro"><strong>350</strong><small>kcal</small></div>
+          </div>
+        </section>
+        <section class="card workout-card">
+          <div class="list-row"><span>Bench press</span><b>4×8</b></div>
+          <div class="list-row"><span>Pull-ups</span><b>4×max</b></div>
+          <div class="list-row"><span>Shoulder press</span><b>3×10</b></div>
+          <div class="list-row"><span>Tricep dips</span><b>3×15</b></div>
+          <div class="cta">Iniciar entrenamiento</div>
+        </section>
+        <nav class="nav" style="--tone: var(--training)"><span>Hoy</span><span>Agenda</span><span class="active">Gym</span><span>Perfil</span></nav>
+      </article>
+
+      <article class="phone" style="--glow: rgba(182,216,255,.16); --tone: var(--tasks)">
+        <div class="status"><span>9:41</span><span>LTE  84%</span></div>
+        <header class="header"><div><p class="eyebrow">Tareas</p><h2>Rutina y pendientes</h2></div><span class="icon-button"><svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><path d="M4 7h16M4 17h16"/></svg></span></header>
+        <section class="task-split">
+          <div class="card mini-list" style="--tone: var(--health)">
+            <h3>Rutina</h3>
+            <div class="pill"><span class="dot"></span><span>Skincare mañana</span></div>
+            <div class="pill"><span class="dot"></span><span>Agua · 2 litros</span></div>
+            <div class="pill"><span class="dot"></span><span>Comidas del plan</span></div>
+            <div class="pill"><span class="dot"></span><span>Entreno 14:00</span></div>
+          </div>
+          <div class="card mini-list" style="--tone: var(--tasks)">
+            <h3>Tareas</h3>
+            <div class="pill"><span class="dot"></span><span>Comprar proteina</span></div>
+            <div class="pill"><span class="dot"></span><span>Pagar alquiler</span></div>
+            <div class="pill"><span class="dot"></span><span>Llamar medico</span></div>
+            <div class="pill"><span class="dot"></span><span>Nota libre</span></div>
+          </div>
+        </section>
+        <section class="card task-card" style="--tone: var(--finance)">
+          <p class="eyebrow">popup sugerido</p>
+          <h3>Pagar alquiler</h3>
+          <div class="list-row"><span>Vence hoy · ARS</span><b>320.000</b></div>
+          <div class="cta">Abrir Finanzas</div>
+        </section>
+        <nav class="nav" style="--tone: var(--tasks)"><span>Hoy</span><span class="active">Tareas</span><span>IA</span><span>Perfil</span></nav>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

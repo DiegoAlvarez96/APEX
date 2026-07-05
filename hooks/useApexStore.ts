@@ -12,7 +12,7 @@ import { buildFinanceRuleKey } from "@/lib/finance";
 import { getRoutineForDate } from "@/lib/routines";
 import { startApexAutoSync, syncApexSnapshot } from "@/lib/sync";
 import { assignedWorkoutTemplateForDate } from "@/lib/trainingTemplates";
-import type { AgendaNote, ApexAlert, AppSettings, BodyMeasurement, ChatMessage, FinanceCategoryRule, FinancePaymentMethod, FinanceScheduledPayment, FinanceSettings, FinanceTransaction, FoodEntry, NutritionLog, NutritionPlanItem, Product, ProductConsumption, ProgressPhoto, ShoppingItem, SleepLog, TaskCompletion, Workout, WorkoutTemplate } from "@/types/apex";
+import type { AgendaNote, ApexAlert, AppSettings, BodyMeasurement, ChatMessage, FinanceCategoryRule, FinancePaymentMethod, FinanceScheduledPayment, FinanceSettings, FinanceTransaction, FoodEntry, NutritionLog, NutritionPlanItem, Product, ProductConsumption, ProgressPhoto, ShoppingItem, SleepLog, SportProfile, TaskCompletion, Workout, WorkoutTemplate } from "@/types/apex";
 
 const APEX_PROCESS_START_DATE_KEY = "2026-07-01";
 
@@ -31,6 +31,7 @@ export function useApexStore(selectedDate: Date) {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [agendaNotes, setAgendaNotes] = useState<AgendaNote[]>([]);
   const [sleepLogs, setSleepLogs] = useState<SleepLog[]>([]);
+  const [sportProfiles, setSportProfiles] = useState<SportProfile[]>([]);
   const [financeTransactions, setFinanceTransactions] = useState<FinanceTransaction[]>([]);
   const [financeCategoryRules, setFinanceCategoryRules] = useState<FinanceCategoryRule[]>([]);
   const [financePaymentMethods, setFinancePaymentMethods] = useState<FinancePaymentMethod[]>([]);
@@ -42,7 +43,7 @@ export function useApexStore(selectedDate: Date) {
   const [ready, setReady] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [nextCompletions, nextProducts, nextConsumptions, nextAlerts, nextNutritionLogs, nextWorkouts, nextTemplates, nextBody, nextShopping, nextChat, nextAgendaNotes, nextSleepLogs, nextFinanceTransactions, nextFinanceCategoryRules, nextFinancePaymentMethods, nextFinanceScheduledPayments, nextFinanceSettings, nextPhotos, nextSettings] = await Promise.all([
+    const [nextCompletions, nextProducts, nextConsumptions, nextAlerts, nextNutritionLogs, nextWorkouts, nextTemplates, nextBody, nextShopping, nextChat, nextAgendaNotes, nextSleepLogs, nextSportProfiles, nextFinanceTransactions, nextFinanceCategoryRules, nextFinancePaymentMethods, nextFinanceScheduledPayments, nextFinanceSettings, nextPhotos, nextSettings] = await Promise.all([
       db.completions.where("dateKey").equals(selectedDateKey).toArray(),
       db.products.orderBy("purchaseDate").reverse().toArray(),
       db.productConsumptions.orderBy("createdAt").reverse().toArray(),
@@ -55,6 +56,7 @@ export function useApexStore(selectedDate: Date) {
       db.chatMessages.orderBy("createdAt").toArray(),
       db.agendaNotes.orderBy("updatedAt").reverse().toArray(),
       db.sleepLogs.orderBy("createdAt").reverse().toArray(),
+      db.sportProfiles.orderBy("updatedAt").reverse().toArray(),
       db.financeTransactions.orderBy("occurredAt").reverse().toArray(),
       db.financeCategoryRules.orderBy("updatedAt").reverse().toArray(),
       db.financePaymentMethods.orderBy("updatedAt").reverse().toArray(),
@@ -76,6 +78,7 @@ export function useApexStore(selectedDate: Date) {
     setChatMessages(nextChat);
     setAgendaNotes(nextAgendaNotes);
     setSleepLogs(nextSleepLogs);
+    setSportProfiles(nextSportProfiles);
     setFinanceTransactions(nextFinanceTransactions);
     setFinanceCategoryRules(nextFinanceCategoryRules);
     setFinancePaymentMethods(nextFinancePaymentMethods);
@@ -243,6 +246,33 @@ export function useApexStore(selectedDate: Date) {
     await refresh();
   }, [refresh]);
 
+  const addSportProfile = useCallback(async (profile: Omit<SportProfile, "id" | "createdAt" | "updatedAt">) => {
+    const now = DateTimeService.nowIso();
+    await db.sportProfiles.add({ ...profile, createdAt: now, updatedAt: now });
+    await refresh();
+    void syncApexSnapshot();
+  }, [refresh]);
+
+  const updateSportProfile = useCallback(async (id: number, profile: Partial<SportProfile>) => {
+    await db.sportProfiles.update(id, { ...profile, updatedAt: DateTimeService.nowIso() });
+    await refresh();
+    void syncApexSnapshot();
+  }, [refresh]);
+
+  const deleteSportProfile = useCallback(async (id: number) => {
+    await db.sportProfiles.delete(id);
+    await refresh();
+    void syncApexSnapshot();
+  }, [refresh]);
+
+  const duplicateSportProfile = useCallback(async (profile: SportProfile) => {
+    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...copy } = profile;
+    const now = DateTimeService.nowIso();
+    await db.sportProfiles.add({ ...copy, name: `${profile.name} copia`, createdAt: now, updatedAt: now });
+    await refresh();
+    void syncApexSnapshot();
+  }, [refresh]);
+
   const deleteNutritionLog = useCallback(async (id: number) => {
     await db.nutritionLogs.delete(id);
     await refresh();
@@ -292,6 +322,7 @@ export function useApexStore(selectedDate: Date) {
       workoutTemplates,
       bodyMeasurements,
       sleepLogs,
+      sportProfiles,
       shoppingItems,
       alerts,
       completions: allCompletions,
@@ -306,6 +337,7 @@ export function useApexStore(selectedDate: Date) {
     productConsumptions: recentConsumptions(productConsumptions, 30),
     workouts: recentByDate(workouts, 30),
     workoutTemplates,
+    sportProfiles,
     body: latestBody,
     bodyMeasurements: recentBodyMeasurements(bodyMeasurements, 30),
     sleep: selectedSleep,
@@ -316,7 +348,7 @@ export function useApexStore(selectedDate: Date) {
     completions: recentByDate(allCompletions, 30),
     agendaNotes: recentByDate(agendaNotes, 30),
     settings
-  }), [agendaNotes, alerts, allCompletions, bodyMeasurements, financeTransactions, latestBody, nutritionLogs, productConsumptions, products, selectedDate, selectedDateKey, selectedNutrition, selectedSleep, settings, shoppingItems, sleepLogs, stockSummaries, workoutTemplates, workouts]);
+  }), [agendaNotes, alerts, allCompletions, bodyMeasurements, financeTransactions, latestBody, nutritionLogs, productConsumptions, products, selectedDate, selectedDateKey, selectedNutrition, selectedSleep, settings, shoppingItems, sleepLogs, sportProfiles, stockSummaries, workoutTemplates, workouts]);
 
   const sendChatMessage = useCallback(async (content: string) => {
     await db.chatMessages.add({ role: "user", content, createdAt: DateTimeService.nowIso() });
@@ -497,6 +529,7 @@ export function useApexStore(selectedDate: Date) {
       financePaymentMethods: await db.financePaymentMethods.toArray(),
       financeScheduledPayments: await db.financeScheduledPayments.toArray(),
       financeSettings: await db.financeSettings.toArray(),
+      sportProfiles: await db.sportProfiles.toArray(),
       photos: await db.photos.toArray(),
       settings: await db.settings.toArray()
     };
@@ -516,6 +549,7 @@ export function useApexStore(selectedDate: Date) {
     workouts,
     selectedWorkouts,
     workoutTemplates,
+    sportProfiles,
     bodyMeasurements,
     latestBody,
     shoppingItems,
@@ -546,6 +580,10 @@ export function useApexStore(selectedDate: Date) {
     duplicateWorkout,
     addWorkoutTemplate,
     deleteWorkoutTemplate,
+    addSportProfile,
+    updateSportProfile,
+    deleteSportProfile,
+    duplicateSportProfile,
     deleteNutritionLog,
     duplicateNutritionLog,
     addBodyMeasurement,
@@ -605,6 +643,7 @@ type ApexProcessContextInput = {
   workoutTemplates: WorkoutTemplate[];
   bodyMeasurements: BodyMeasurement[];
   sleepLogs: SleepLog[];
+  sportProfiles: SportProfile[];
   shoppingItems: ShoppingItem[];
   alerts: ApexAlert[];
   completions: TaskCompletion[];
@@ -640,6 +679,15 @@ function buildApexProcessContext(input: ApexProcessContextInput) {
       nutrition: input.settings.nutritionGoal ?? null,
       training: input.settings.trainingGoal ?? null
     },
+    configuredSports: input.sportProfiles.map((profile) => ({
+      name: profile.name,
+      category: profile.category,
+      specification: profile.specification,
+      status: profile.status,
+      goal: profile.goal,
+      mode: profile.mode,
+      schedules: profile.schedules
+    })),
     recent30Days: buildRecentContext(input),
     pendingShopping: input.shoppingItems.filter((item) => item.status === "pending"),
     activeAlerts: input.alerts.filter((alert) => alert.status === "active" || alert.status === "buy")

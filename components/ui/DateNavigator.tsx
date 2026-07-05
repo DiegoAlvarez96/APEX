@@ -34,13 +34,13 @@ export function DateNavigator({
         </button>
       </div>
       <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto">
-        <button className="flex h-10 shrink-0 items-center gap-1 rounded-full bg-white/[0.06] px-3 text-xs light:bg-black/[0.04]" type="button" onClick={() => onSelectDate(yesterday)}>
+        <button className="flex h-10 shrink-0 items-center gap-1 rounded-full bg-[rgba(var(--module-accent),0.08)] px-3 text-xs text-[rgb(var(--muted))]" type="button" onClick={() => onSelectDate(yesterday)}>
           <ChevronLeft size={15} /> {formatDateKey(dateKey(yesterday))}
         </button>
-        <button className="h-10 shrink-0 rounded-full bg-limeglass px-4 text-sm font-semibold text-black" type="button" onClick={() => onSelectDate(selectedDate)}>
+        <button className="h-10 shrink-0 rounded-full bg-[rgb(var(--module-accent))] px-4 text-sm font-semibold text-[rgb(var(--bg))]" type="button" onClick={() => onSelectDate(selectedDate)}>
           {label}
         </button>
-        <button className="flex h-10 shrink-0 items-center gap-1 rounded-full bg-white/[0.06] px-3 text-xs light:bg-black/[0.04]" type="button" onClick={() => onSelectDate(tomorrow)}>
+        <button className="flex h-10 shrink-0 items-center gap-1 rounded-full bg-[rgba(var(--module-accent),0.08)] px-3 text-xs text-[rgb(var(--muted))]" type="button" onClick={() => onSelectDate(tomorrow)}>
           {formatDateKey(dateKey(tomorrow))} <ChevronRight size={15} />
         </button>
       </div>

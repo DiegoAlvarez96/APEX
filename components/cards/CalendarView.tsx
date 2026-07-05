@@ -1,8 +1,8 @@
 "use client";
 
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
-import { Card } from "@/components/ui/Card";
+import { useEffect, useState } from "react";
+import { Card, SectionTitle } from "@/components/ui/Card";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { TaskList } from "@/components/cards/TaskList";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
@@ -10,8 +10,9 @@ import { addDays, dateKey, dayOfMonth, fullDate, monthStart, monthTitle, weekday
 import { buildAgendaDetail } from "@/lib/agenda";
 import { getRoutineForDate } from "@/lib/routines";
 import { formatSleepDuration } from "@/lib/sleep";
+import { sportCategoryLabel } from "@/lib/sports";
 import { assignedWorkoutTemplateForDate } from "@/lib/trainingTemplates";
-import type { BodyMeasurement, FinanceScheduledPayment, NutritionLog, ProductStockSummary, SleepLog, Workout, WorkoutTemplate } from "@/types/apex";
+import type { BodyMeasurement, FinanceScheduledPayment, NutritionLog, ProductStockSummary, SleepLog, SportProfile, Workout, WorkoutTemplate } from "@/types/apex";
 import type { ViewKey } from "@/components/layout/BottomNav";
 
 export function CalendarView({
@@ -24,6 +25,7 @@ export function CalendarView({
   nutrition,
   bodyMeasurements,
   workoutTemplates,
+  sportProfiles,
   financeScheduledPayments,
   previousSleep,
   note,
@@ -41,6 +43,7 @@ export function CalendarView({
   nutrition?: NutritionLog;
   bodyMeasurements: BodyMeasurement[];
   workoutTemplates: WorkoutTemplate[];
+  sportProfiles: SportProfile[];
   financeScheduledPayments: FinanceScheduledPayment[];
   previousSleep?: SleepLog;
   note?: string;
@@ -57,11 +60,12 @@ export function CalendarView({
   const previousDateLabel = fullDate(addDays(selectedDate, -1));
   const workoutsForDay = workouts.filter((workout) => workout.dateKey === selectedDateKey);
   const detail = buildAgendaDetail(selectedDate, workoutsForDay, stockSummaries);
+  const financePaymentsForDay = financeScheduledPayments.filter((payment) => payment.dueDateKey === selectedDateKey);
   const routine = getRoutineForDate(selectedDate);
   const skincareTasks = routine.tasks.filter((task) => task.category === "skincare" || task.category === "beard" || task.category === "hair");
   const assignedWorkout = assignedWorkoutTemplateForDate(selectedDate, workoutTemplates);
+  const sportsForDay = sportProfiles.filter((profile) => profile.status === "active" && profile.schedules.some((schedule) => schedule.weekday === weekdayInAppTimeZone(selectedDate)));
   const bodyForDay = bodyMeasurements.find((measurement) => measurement.dateKey === selectedDateKey);
-  const financePaymentsForDay = financeScheduledPayments.filter((payment) => payment.dueDateKey === selectedDateKey);
   const currentHour = new Date().getHours();
   const currentMinutes = currentHour * 60 + new Date().getMinutes();
   const dayProgressPct = Math.round((currentMinutes / 1440) * 100);
@@ -72,6 +76,8 @@ export function CalendarView({
     nutrition,
     workoutsForDay,
     assignedWorkout,
+    sportsForDay,
+    selectedWeekday: weekdayInAppTimeZone(selectedDate),
     previousSleep,
     bodyForDay
   });
@@ -84,13 +90,12 @@ export function CalendarView({
     if (displayMode === "week" || displayMode === "month") onModeChange(displayMode);
   }, [displayMode, onModeChange]);
 
-  const days =
-    displayMode === "week" || displayMode === "day"
-      ? Array.from({ length: 7 }, (_, index) => addDays(selectedDate, index - weekdayInAppTimeZone(selectedDate)))
-      : Array.from({ length: 35 }, (_, index) => {
-          const start = monthStart(selectedDate);
-          return addDays(start, index - weekdayInAppTimeZone(start));
-        });
+  const weekDays = Array.from({ length: 7 }, (_, index) => addDays(selectedDate, index - weekdayInAppTimeZone(selectedDate)));
+  const monthDays = Array.from({ length: 35 }, (_, index) => {
+    const start = monthStart(selectedDate);
+    return addDays(start, index - weekdayInAppTimeZone(start));
+  });
+  const todayKey = dateKey(new Date());
 
   return (
     <div className="space-y-3">
@@ -111,47 +116,27 @@ export function CalendarView({
 
       <SegmentedControl value={displayMode} onChange={setDisplayMode} options={[{ value: "day", label: "Dia" }, { value: "week", label: "Semana" }, { value: "month", label: "Mes" }, { value: "timeline", label: "Timeline" }]} />
 
+      {displayMode === "day" ? (
+        <DateStrip days={weekDays} selectedDateKey={selectedDateKey} onSelectDate={onSelectDate} background={agendaBackground} />
+      ) : null}
+
       {displayMode === "week" ? (
         <WeekTeamsView
-          days={days}
+          days={weekDays}
           selectedDateKey={selectedDateKey}
+          todayKey={todayKey}
+          currentMinutes={currentMinutes}
           workouts={workouts}
           nutrition={nutrition}
+          assignedWorkout={assignedWorkout}
           onSelectDate={onSelectDate}
           onOpen={setSheet}
         />
-      ) : (
-        <Card className="p-3" style={{ background: agendaBackground }}>
-          <div className="mb-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/55">Vista</p>
-            <h2 className="text-base font-semibold text-white">{monthTitle(selectedDate)}</h2>
-          </div>
-          <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-white/55">
-            {["D", "L", "M", "M", "J", "V", "S"].map((day, index) => (
-              <div key={`${day}-${index}`}>{day}</div>
-            ))}
-          </div>
-          <div className="mt-2 grid grid-cols-7 gap-1">
-            {days.map((day) => {
-              const active = dateKey(day) === selectedDateKey;
-              const routine = getRoutineForDate(day);
-              return (
-                <button
-                  key={dateKey(day)}
-                  type="button"
-                  onClick={() => onSelectDate(day)}
-                  className={`aspect-square rounded-xl p-1 text-center transition ${
-                    active ? "bg-limeglass text-black" : "bg-[rgb(var(--surface-strong))] text-[rgb(var(--text))] hover:brightness-110"
-                  }`}
-                >
-                  <span className="block text-xs font-semibold">{dayOfMonth(day)}</span>
-                  <span className="mx-auto mt-1 block size-1.5 rounded-full bg-current opacity-40" aria-label={`${routine.tasks.length} items`} />
-                </button>
-              );
-            })}
-          </div>
-        </Card>
-      )}
+      ) : null}
+
+      {displayMode === "month" ? (
+        <MonthOverview days={monthDays} selectedDateKey={selectedDateKey} todayKey={todayKey} currentMinutes={currentMinutes} selectedMonthTitle={monthTitle(selectedDate)} onSelectDate={onSelectDate} />
+      ) : null}
 
       {displayMode === "day" || displayMode === "timeline" ? (
         <DayTimeline
@@ -166,7 +151,7 @@ export function CalendarView({
 
       <CompactDisclosure title="Resumen del dia" eyebrow={`${dayProgressPct}% consumido`}>
         <div className="grid grid-cols-2 gap-2">
-          <button className="w-full text-left" type="button" onClick={() => setSheet("dashboard")}><AgendaMetric label="Tareas" value={`${skincareTasks.filter((task) => isDone(task.id)).length}/${skincareTasks.length}`} /></button>
+          <button className="w-full text-left" type="button" onClick={() => setSheet("dashboard")}><AgendaMetric label="Skincare" value={`${skincareTasks.filter((task) => isDone(task.id)).length}/${skincareTasks.length}`} /></button>
           <button className="w-full text-left" type="button" onClick={() => setSheet("nutrition")}><AgendaMetric label="Nutricion" value={nutrition ? `${Math.round(nutrition.calories)} kcal` : "Sin cargar"} /></button>
           <button className="w-full text-left" type="button" onClick={() => setSheet("training")}><AgendaMetric label="Entreno" value={workoutsForDay.length ? `${workoutsForDay.length}` : assignedWorkout.group} /></button>
           <button className="w-full text-left" type="button" onClick={() => setSheet("physical")}><AgendaMetric label="Fisico" value={bodyForDay ? `${bodyForDay.weightKg} kg` : "Sin cargar"} /></button>
@@ -182,25 +167,26 @@ export function CalendarView({
       <div className="grid gap-2 md:grid-cols-2">
         <NutritionAgendaCard nutrition={nutrition} selectedDateLabel={selectedDateLabel} onOpen={() => onOpenModule("nutrition")} />
 
-        <TrainingAgendaCard workouts={workoutsForDay} assigned={assignedWorkout} selectedDateLabel={selectedDateLabel} onOpen={() => onOpenModule("training")} />
+        <TrainingAgendaCard workouts={workoutsForDay} assigned={assignedWorkout} sportsForDay={sportsForDay} selectedWeekday={weekdayInAppTimeZone(selectedDate)} selectedDateLabel={selectedDateLabel} onOpen={() => onOpenModule("training")} />
 
         <BodyAgendaCard measurement={bodyForDay} selectedDateLabel={selectedDateLabel} onOpen={() => onOpenModule("physical")} />
 
         <SleepAgendaCard sleep={previousSleep} previousDateLabel={previousDateLabel} />
       </div>
 
-      <CompactDisclosure title="Corregir dia" eyebrow="Editable historicamente">
+      <Card className="p-3">
+        <SectionTitle title="Corregir dia" eyebrow="Editable historicamente" />
         <TaskList tasks={routine.tasks} isDone={isDone} onToggle={onToggle} />
-        <textarea className="mt-2 min-h-20 w-full rounded-xl bg-white/[0.08] px-3 py-2 text-xs outline-none light:bg-black/[0.05]" value={draftNote} onChange={(event) => setDraftNote(event.target.value)} placeholder="Notas, correcciones, objetivos o actividades del dia" />
-        <button className="mt-2 h-9 w-full rounded-xl bg-limeglass text-xs font-semibold text-black" type="button" onClick={() => onSaveNote(draftNote)}>Guardar nota</button>
-      </CompactDisclosure>
+        <textarea className="mt-4 min-h-24 w-full rounded-3xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={draftNote} onChange={(event) => setDraftNote(event.target.value)} placeholder="Notas, correcciones, objetivos o actividades del dia" />
+        <button className="apex-action mt-3 h-11 w-full rounded-2xl font-semibold" type="button" onClick={() => onSaveNote(draftNote)}>Guardar nota</button>
+      </Card>
 
       <BottomSheet open={sheet !== null} title={sheetTitle(sheet)} eyebrow={selectedDateLabel} onClose={() => setSheet(null)}>
         {sheet === "dashboard" ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <button type="button" className="w-full text-left" onClick={() => onOpenModule("dashboard")}>
-              <h3 className="text-sm font-semibold">Abrir Tareas completo</h3>
-              <p className="mt-0.5 text-xs text-[rgb(var(--muted))]">Toca el titulo para editar toda la rutina.</p>
+              <h3 className="text-lg font-semibold">Abrir Skincare completo</h3>
+              <p className="mt-1 text-sm text-[rgb(var(--muted))]">Toca el titulo para editar toda la rutina.</p>
             </button>
             <TaskList tasks={skincareTasks} isDone={isDone} onToggle={onToggle} />
           </div>
@@ -241,10 +227,10 @@ function AgendaMetric({ label, value }: { label: string; value: string }) {
 }
 
 function agendaGradient(hour: number) {
-  if (hour >= 5 && hour < 11) return "linear-gradient(180deg, rgba(42, 68, 92, 0.92) 0%, rgba(29, 38, 48, 0.95) 48%, rgba(18, 20, 25, 0.98) 100%)";
-  if (hour >= 11 && hour < 17) return "linear-gradient(180deg, rgba(52, 74, 86, 0.92) 0%, rgba(43, 55, 57, 0.95) 45%, rgba(19, 22, 26, 0.98) 100%)";
-  if (hour >= 17 && hour < 21) return "linear-gradient(180deg, rgba(81, 54, 74, 0.95) 0%, rgba(58, 45, 63, 0.95) 48%, rgba(18, 20, 25, 0.98) 100%)";
-  return "linear-gradient(180deg, rgba(22, 28, 50, 0.96) 0%, rgba(18, 22, 36, 0.98) 48%, rgba(9, 10, 12, 1) 100%)";
+  if (hour >= 5 && hour < 11) return "linear-gradient(180deg, rgba(37, 77, 112, 0.94) 0%, rgba(26, 43, 61, 0.96) 48%, rgba(14, 18, 25, 0.99) 100%)";
+  if (hour >= 11 && hour < 17) return "linear-gradient(180deg, rgba(42, 94, 123, 0.94) 0%, rgba(32, 59, 75, 0.96) 45%, rgba(14, 19, 26, 0.99) 100%)";
+  if (hour >= 17 && hour < 21) return "linear-gradient(180deg, rgba(51, 86, 128, 0.94) 0%, rgba(36, 51, 79, 0.96) 48%, rgba(14, 18, 25, 0.99) 100%)";
+  return "linear-gradient(180deg, rgba(24, 42, 82, 0.96) 0%, rgba(17, 27, 52, 0.98) 48%, rgba(7, 10, 18, 1) 100%)";
 }
 
 type TimelineModule = "dashboard" | "nutrition" | "training" | "physical";
@@ -290,8 +276,8 @@ function DayTimeline({
           <p className="text-xs font-semibold text-white">{progress}%</p>
         </div>
       </div>
-      <div className="relative h-[360px] overflow-hidden rounded-2xl bg-black/18 ring-1 ring-white/8">
-        <div className="absolute inset-x-0 top-0 bg-white/[0.075]" style={{ height: `${currentTop}%` }} />
+      <div className="relative h-[360px] overflow-hidden rounded-2xl bg-black/22 ring-1 ring-white/8">
+        <div className="absolute inset-x-0 top-0 bg-[linear-gradient(180deg,rgba(125,211,252,0.24),rgba(125,211,252,0.12))]" style={{ height: `${currentTop}%` }} />
         {[8, 10, 12, 14, 16, 18, 20, 22].map((hour) => (
           <div key={hour} className="absolute left-0 right-0 border-t border-white/[0.06]" style={{ top: `${((hour - startHour) / (endHour - startHour)) * 100}%` }}>
             <span className="absolute -top-2 left-2 text-[9px] font-semibold text-white/40">{`${hour}:00`}</span>
@@ -312,51 +298,102 @@ function DayTimeline({
             </button>
           );
         })}
-        <div className="absolute left-0 right-0 z-10 border-t border-[#ff6f3d] shadow-[0_0_18px_rgba(255,111,61,0.65)]" style={{ top: `${currentTop}%` }}>
-          <span className="absolute -top-2 left-1 rounded-full bg-[#ff6f3d] px-1.5 py-0.5 text-[9px] font-bold text-black">{now}</span>
+        <div className="absolute left-0 right-0 z-10 border-t border-sky-300 shadow-[0_0_18px_rgba(125,211,252,0.58)]" style={{ top: `${currentTop}%` }}>
+          <span className="absolute -top-2 left-1 rounded-full bg-sky-300 px-1.5 py-0.5 text-[9px] font-bold text-slate-950">{now}</span>
         </div>
       </div>
     </section>
   );
 }
 
+function DateStrip({ days, selectedDateKey, onSelectDate, background }: { days: Date[]; selectedDateKey: string; onSelectDate: (date: Date) => void; background: string }) {
+  return (
+    <Card className="p-3" style={{ background }}>
+      <div className="mb-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/55">Dia</p>
+        <h2 className="text-base font-semibold text-white">Vista diaria</h2>
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {days.map((day) => {
+          const key = dateKey(day);
+          const active = key === selectedDateKey;
+          const routine = getRoutineForDate(day);
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onSelectDate(day)}
+              className={`aspect-square rounded-xl p-1 text-center transition ${
+                active ? "apex-action" : "bg-white/[0.07] text-[rgb(var(--text))] hover:bg-white/[0.10]"
+              }`}
+            >
+              <span className="block text-[10px] font-semibold text-current/70">{["D", "L", "M", "M", "J", "V", "S"][day.getDay()]}</span>
+              <span className="block text-xs font-semibold">{dayOfMonth(day)}</span>
+              <span className="mx-auto mt-1 block size-1.5 rounded-full bg-current opacity-40" aria-label={`${routine.tasks.length} items`} />
+            </button>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 function WeekTeamsView({
   days,
   selectedDateKey,
+  todayKey,
+  currentMinutes,
   workouts,
   nutrition,
+  assignedWorkout,
   onSelectDate,
   onOpen
 }: {
   days: Date[];
   selectedDateKey: string;
+  todayKey: string;
+  currentMinutes: number;
   workouts: Workout[];
   nutrition?: NutritionLog;
+  assignedWorkout: WorkoutTemplate;
   onSelectDate: (date: Date) => void;
   onOpen: (module: TimelineModule) => void;
 }) {
-  const hours = [8, 10, 12, 14, 16, 18, 20, 22];
-  const visibleDays = days.slice(0, 7);
+  const hours = [7, 8, 10, 12, 14, 16, 18, 20, 22];
 
   return (
-    <section className="overflow-hidden rounded-[18px] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-soft">
-      <div className="grid grid-cols-[38px_repeat(7,minmax(42px,1fr))] border-b border-[rgb(var(--border))] bg-[rgb(var(--surface-strong))]">
-        <div className="p-1.5 text-[9px] text-[rgb(var(--muted))]">Hora</div>
-        {visibleDays.map((day) => {
-          const key = dateKey(day);
-          const active = key === selectedDateKey;
-          return (
-            <button key={key} type="button" onClick={() => onSelectDate(day)} className={`p-1.5 text-center ${active ? "bg-limeglass text-black" : ""}`}>
-              <span className="block text-[9px] font-semibold">{["D", "L", "M", "M", "J", "V", "S"][day.getUTCDay()]}</span>
-              <span className="block text-xs font-bold">{dayOfMonth(day)}</span>
-            </button>
-          );
-        })}
+    <section className="apex-card overflow-hidden rounded-[22px]">
+      <div className="flex items-center justify-between gap-3 px-3 py-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--muted))]">Semana</p>
+          <h2 className="text-base font-semibold">Calendario semanal</h2>
+        </div>
+        <p className="text-right text-[11px] leading-4 text-[rgb(var(--muted))]">Días pasados<br />consumidos</p>
       </div>
-      <div className="grid grid-cols-[38px_repeat(7,minmax(42px,1fr))]">
-        {hours.map((hour) => (
-          <WeekRow key={hour} hour={hour} days={visibleDays} workouts={workouts} nutrition={nutrition} onOpen={onOpen} />
-        ))}
+      <div className="no-scrollbar overflow-x-auto">
+        <div className="min-w-[740px]">
+          <div className="grid grid-cols-[42px_repeat(7,minmax(92px,1fr))] border-y border-white/10 bg-white/[0.045]">
+            <div className="px-2 py-2 text-[10px] font-semibold text-[rgb(var(--muted))]">Hora</div>
+            {days.map((day) => {
+              const key = dateKey(day);
+              const active = key === selectedDateKey;
+              const consumption = dayConsumption(key, todayKey, currentMinutes);
+              return (
+                <button key={key} type="button" onClick={() => onSelectDate(day)} className={`relative overflow-hidden px-2 py-2 text-left transition ${active ? "text-slate-950" : ""}`}>
+                  <span className="absolute inset-x-0 top-0 bg-sky-300/25" style={{ height: `${consumption}%` }} />
+                  {active ? <span className="absolute inset-1 rounded-xl bg-sky-300" /> : null}
+                  <span className="relative block text-[10px] font-semibold uppercase">{["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"][day.getDay()]}</span>
+                  <span className="relative text-lg font-bold">{dayOfMonth(day)}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-[42px_repeat(7,minmax(92px,1fr))]">
+            {hours.map((hour) => (
+              <WeekRow key={hour} hour={hour} days={days} selectedDateKey={selectedDateKey} todayKey={todayKey} currentMinutes={currentMinutes} workouts={workouts} nutrition={nutrition} assignedWorkout={assignedWorkout} onOpen={onOpen} />
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -365,30 +402,42 @@ function WeekTeamsView({
 function WeekRow({
   hour,
   days,
+  selectedDateKey,
+  todayKey,
+  currentMinutes,
   workouts,
   nutrition,
+  assignedWorkout,
   onOpen
 }: {
   hour: number;
   days: Date[];
+  selectedDateKey: string;
+  todayKey: string;
+  currentMinutes: number;
   workouts: Workout[];
   nutrition?: NutritionLog;
+  assignedWorkout: WorkoutTemplate;
   onOpen: (module: TimelineModule) => void;
 }) {
   return (
     <>
-      <div className="min-h-16 border-b border-r border-[rgb(var(--border))] px-1 py-2 text-[9px] font-semibold text-[rgb(var(--muted))]">{hour}:00</div>
+      <div className="min-h-[68px] border-b border-r border-white/10 px-2 py-2 text-[10px] font-semibold text-[rgb(var(--muted))]">{hour}:00</div>
       {days.map((day) => {
         const key = dateKey(day);
         const routine = getRoutineForDate(day);
         const dayWorkouts = workouts.filter((workout) => workout.dateKey === key);
-        const blocks = weekBlocksForHour(hour, routine.tasks.length, dayWorkouts, nutrition && nutrition.dateKey === key ? nutrition : undefined);
+        const blocks = weekBlocksForHour(hour, routine.tasks.length, dayWorkouts, nutrition && nutrition.dateKey === key ? nutrition : undefined, assignedWorkout);
+        const consumption = dayConsumption(key, todayKey, currentMinutes);
+        const active = key === selectedDateKey;
         return (
-          <div key={`${key}-${hour}`} className="min-h-16 border-b border-r border-[rgb(var(--border))] p-1">
-            <div className="space-y-1">
+          <div key={`${key}-${hour}`} className={`relative min-h-[68px] overflow-hidden border-b border-r border-white/10 p-1.5 ${active ? "bg-white/[0.05]" : ""}`}>
+            <div className="absolute inset-x-0 top-0 bg-sky-300/12" style={{ height: `${consumption}%` }} />
+            <div className="relative space-y-1">
               {blocks.map((block) => (
-                <button key={`${block.title}-${hour}`} type="button" onClick={() => onOpen(block.module)} className="block w-full rounded-md px-1.5 py-1 text-left text-[9px] font-semibold leading-3 text-black" style={{ backgroundColor: block.color }}>
+                <button key={`${key}-${hour}-${block.title}`} type="button" onClick={() => onOpen(block.module)} className="block w-full rounded-lg px-2 py-1.5 text-left text-[10px] font-semibold leading-3 text-slate-950 shadow-sm" style={{ backgroundColor: block.color }}>
                   <span className="block truncate">{block.title}</span>
+                  <span className="block truncate opacity-70">{block.detail}</span>
                 </button>
               ))}
             </div>
@@ -399,18 +448,67 @@ function WeekRow({
   );
 }
 
-function weekBlocksForHour(hour: number, routineCount: number, workouts: Workout[], nutrition?: NutritionLog) {
-  const blocks: { title: string; color: string; module: TimelineModule }[] = [];
-  if (hour === 8) blocks.push({ title: `Rutina ${routineCount}`, color: "#86efac", module: "dashboard" });
-  if (hour === 12) blocks.push({ title: nutrition ? `${Math.round(nutrition.calories)} kcal` : "Comida", color: "#93c5fd", module: "nutrition" });
-  if (hour === 18) blocks.push({ title: workouts[0]?.title ?? "Gym", color: "#c4b5fd", module: "training" });
-  if (hour === 20) blocks.push({ title: "Tareas", color: "#fcd34d", module: "dashboard" });
+function MonthOverview({
+  days,
+  selectedDateKey,
+  todayKey,
+  currentMinutes,
+  selectedMonthTitle,
+  onSelectDate
+}: {
+  days: Date[];
+  selectedDateKey: string;
+  todayKey: string;
+  currentMinutes: number;
+  selectedMonthTitle: string;
+  onSelectDate: (date: Date) => void;
+}) {
+  return (
+    <Card className="p-3">
+      <div className="mb-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--muted))]">Mes</p>
+        <h2 className="text-base font-semibold">{selectedMonthTitle}</h2>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-[rgb(var(--muted))]">
+        {["D", "L", "M", "M", "J", "V", "S"].map((day, index) => <div key={`${day}-${index}`}>{day}</div>)}
+      </div>
+      <div className="mt-2 grid grid-cols-7 gap-1">
+        {days.map((day) => {
+          const key = dateKey(day);
+          const active = key === selectedDateKey;
+          const routine = getRoutineForDate(day);
+          const consumption = dayConsumption(key, todayKey, currentMinutes);
+          return (
+            <button key={key} type="button" onClick={() => onSelectDate(day)} className={`relative aspect-square overflow-hidden rounded-xl border border-white/10 bg-white/[0.055] p-1 text-center transition ${active ? "ring-2 ring-sky-300" : ""}`}>
+              <span className="absolute inset-x-0 top-0 bg-sky-300/18" style={{ height: `${consumption}%` }} />
+              <span className="relative block text-xs font-semibold">{dayOfMonth(day)}</span>
+              <span className="relative mx-auto mt-1 block size-1.5 rounded-full bg-[rgb(var(--module-accent))] opacity-70" aria-label={`${routine.tasks.length} items`} />
+            </button>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+function weekBlocksForHour(hour: number, routineCount: number, workouts: Workout[], nutrition: NutritionLog | undefined, assignedWorkout: WorkoutTemplate) {
+  const blocks: { title: string; detail: string; color: string; module: TimelineModule }[] = [];
+  if (hour === 8) blocks.push({ title: `Rutina ${routineCount}`, detail: "Tareas", color: "#bae6fd", module: "dashboard" });
+  if (hour === 12) blocks.push({ title: nutrition ? `${Math.round(nutrition.calories)} kcal` : "Comida", detail: "Nutricion", color: "#bbf7d0", module: "nutrition" });
+  if (hour === 18) blocks.push({ title: workouts[0]?.title ?? assignedWorkout.group, detail: "Gym", color: "#bef264", module: "training" });
+  if (hour === 22) blocks.push({ title: "Descanso", detail: "Rutina noche", color: "#c4b5fd", module: "dashboard" });
   return blocks;
 }
 
-function CompactDisclosure({ title, eyebrow, children }: { title: string; eyebrow?: string; children: ReactNode }) {
+function dayConsumption(key: string, todayKey: string, currentMinutes: number) {
+  if (key < todayKey) return 100;
+  if (key > todayKey) return 0;
+  return Math.round((currentMinutes / 1440) * 100);
+}
+
+function CompactDisclosure({ title, eyebrow, children }: { title: string; eyebrow?: string; children: React.ReactNode }) {
   return (
-    <details className="group rounded-[16px] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-3 shadow-soft">
+    <details className="apex-card group rounded-[18px] p-3">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
         <span>
           {eyebrow ? <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--muted))]">{eyebrow}</span> : null}
@@ -429,6 +527,8 @@ function buildDayTimelineItems({
   nutrition,
   workoutsForDay,
   assignedWorkout,
+  sportsForDay,
+  selectedWeekday,
   previousSleep,
   bodyForDay
 }: {
@@ -437,13 +537,27 @@ function buildDayTimelineItems({
   nutrition?: NutritionLog;
   workoutsForDay: Workout[];
   assignedWorkout: WorkoutTemplate;
+  sportsForDay: SportProfile[];
+  selectedWeekday: number;
   previousSleep?: SleepLog;
   bodyForDay?: BodyMeasurement;
 }): DayTimelineItem[] {
+  const sportItems: DayTimelineItem[] = sportsForDay.flatMap((profile) =>
+    profile.schedules
+      .filter((schedule) => schedule.weekday === selectedWeekday)
+      .map((schedule) => ({
+        time: schedule.startTime,
+        title: profile.name,
+        detail: `${sportCategoryLabel(profile.category)} · ${schedule.startTime}-${schedule.endTime} · ${schedule.type === "competition" ? "Competicion" : "Entrenamiento"}`,
+        color: schedule.type === "competition" ? "#ef4444" : profile.accent,
+        module: "training" as const,
+        done: false
+      }))
+  );
   return [
     {
       time: "09:00",
-      title: "Tareas",
+      title: "Skincare",
       detail: `${skincareDone}/${skincareTotal} pasos completados`,
       color: "#22c55e",
       module: "dashboard",
@@ -473,6 +587,7 @@ function buildDayTimelineItems({
       module: "training",
       done: workoutsForDay.some((workout) => workout.completed)
     },
+    ...sportItems,
     {
       time: "20:30",
       title: "Fisico",
@@ -502,7 +617,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function sheetTitle(sheet: "dashboard" | "nutrition" | "training" | "physical" | null) {
-  if (sheet === "dashboard") return "Tareas";
+  if (sheet === "dashboard") return "Skincare";
   if (sheet === "nutrition") return "Nutricion";
   if (sheet === "training") return "Entrenamiento";
   if (sheet === "physical") return "Fisico";
@@ -511,10 +626,10 @@ function sheetTitle(sheet: "dashboard" | "nutrition" | "training" | "physical" |
 
 function SheetSummary({ title, rows, onOpen }: { title: string; rows: [string, string][]; onOpen: () => void }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <button type="button" className="w-full text-left" onClick={onOpen}>
-        <h3 className="text-sm font-semibold">{title}</h3>
-        <p className="mt-0.5 text-xs text-[rgb(var(--muted))]">Toca el titulo para ver o editar el modulo completo.</p>
+        <h3 className="text-lg font-semibold">{title}</h3>
+        <p className="mt-1 text-sm text-[rgb(var(--muted))]">Toca el titulo para ver o editar el modulo completo.</p>
       </button>
       <div className="grid grid-cols-2 gap-2">
         {rows.map(([label, value]) => <AgendaMetric key={label} label={label} value={value} />)}
@@ -527,9 +642,9 @@ function NutritionAgendaCard({ nutrition, selectedDateLabel, onOpen }: { nutriti
   const planTotal = nutrition?.planItems?.length ?? 0;
   const planDone = nutrition?.planItems?.filter((item) => item.done).length ?? 0;
   return (
-    <CompactDisclosure title="Nutricion" eyebrow={nutrition ? `${Math.round(nutrition.calories)} kcal` : selectedDateLabel}>
-      <button className="mb-2 w-full rounded-xl bg-[rgb(var(--surface-strong))] px-3 py-2 text-left text-xs font-semibold" type="button" onClick={onOpen}>
-        Abrir modulo completo
+    <Card className="p-3">
+      <button className="mb-2 w-full text-left" type="button" onClick={onOpen}>
+        <SectionTitle title="Nutricion" eyebrow={selectedDateLabel} />
       </button>
       {nutrition ? (
         <div className="space-y-2">
@@ -556,15 +671,15 @@ function NutritionAgendaCard({ nutrition, selectedDateLabel, onOpen }: { nutriti
       ) : (
         <p className="text-xs text-[rgb(var(--muted))]">Todavia no hay nutricion guardada para este dia.</p>
       )}
-    </CompactDisclosure>
+    </Card>
   );
 }
 
-function TrainingAgendaCard({ workouts, assigned, selectedDateLabel, onOpen }: { workouts: Workout[]; assigned: WorkoutTemplate; selectedDateLabel: string; onOpen: () => void }) {
+function TrainingAgendaCard({ workouts, assigned, sportsForDay, selectedWeekday, selectedDateLabel, onOpen }: { workouts: Workout[]; assigned: WorkoutTemplate; sportsForDay: SportProfile[]; selectedWeekday: number; selectedDateLabel: string; onOpen: () => void }) {
   return (
-    <CompactDisclosure title="Entrenamiento" eyebrow={workouts.length ? `${workouts.length} registros` : assigned.group}>
-      <button className="mb-2 w-full rounded-xl bg-[rgb(var(--surface-strong))] px-3 py-2 text-left text-xs font-semibold" type="button" onClick={onOpen}>
-        Abrir modulo completo
+    <Card className="p-3">
+      <button className="mb-2 w-full text-left" type="button" onClick={onOpen}>
+        <SectionTitle title="Entrenamiento" eyebrow={selectedDateLabel} />
       </button>
       {workouts.length ? (
         <div className="space-y-2">
@@ -586,15 +701,25 @@ function TrainingAgendaCard({ workouts, assigned, selectedDateLabel, onOpen }: {
           <p className="mt-1 text-xs text-[rgb(var(--muted))]">Planificado automaticamente - pendiente.</p>
         </div>
       )}
-    </CompactDisclosure>
+      {sportsForDay.length ? (
+        <div className="mt-2 space-y-2">
+          {sportsForDay.map((profile) => profile.schedules.filter((schedule) => schedule.weekday === selectedWeekday).map((schedule) => (
+            <div key={`${profile.id}-${schedule.id}`} className={`rounded-xl p-3 ${schedule.type === "competition" ? "bg-red-500/50" : "bg-white/[0.055]"}`}>
+              <p className="text-sm font-semibold">{profile.name}</p>
+              <p className="mt-1 text-xs text-[rgb(var(--muted))]">{schedule.startTime}-{schedule.endTime} · {schedule.type === "competition" ? "Competicion" : "Entrenamiento"} · {profile.mode === "custom_training" ? "IA" : "Solo card"}</p>
+            </div>
+          )))}
+        </div>
+      ) : null}
+    </Card>
   );
 }
 
 function BodyAgendaCard({ measurement, selectedDateLabel, onOpen }: { measurement?: BodyMeasurement; selectedDateLabel: string; onOpen: () => void }) {
   return (
-    <CompactDisclosure title="Fisico" eyebrow={measurement ? `${measurement.weightKg} kg` : selectedDateLabel}>
-      <button className="mb-2 w-full rounded-xl bg-[rgb(var(--surface-strong))] px-3 py-2 text-left text-xs font-semibold" type="button" onClick={onOpen}>
-        Abrir modulo completo
+    <Card className="p-3">
+      <button className="mb-2 w-full text-left" type="button" onClick={onOpen}>
+        <SectionTitle title="Fisico" eyebrow={selectedDateLabel} />
       </button>
       {measurement ? (
         <div className="grid grid-cols-2 gap-2">
@@ -606,13 +731,14 @@ function BodyAgendaCard({ measurement, selectedDateLabel, onOpen }: { measuremen
       ) : (
         <p className="text-xs text-[rgb(var(--muted))]">No hay medicion fisica registrada para este dia.</p>
       )}
-    </CompactDisclosure>
+    </Card>
   );
 }
 
 function SleepAgendaCard({ sleep, previousDateLabel }: { sleep?: SleepLog; previousDateLabel: string }) {
   return (
-    <CompactDisclosure title="Sueno anterior" eyebrow={sleep ? formatSleepDuration(sleep.durationMinutes) : previousDateLabel}>
+    <Card className="p-3">
+      <SectionTitle title="Sueno del dia anterior" eyebrow={previousDateLabel} />
       {sleep ? (
         <div className="grid grid-cols-3 gap-2">
           <AgendaMetric label="Dormir" value={sleep.sleepTime} />
@@ -622,7 +748,7 @@ function SleepAgendaCard({ sleep, previousDateLabel }: { sleep?: SleepLog; previ
       ) : (
         <p className="text-xs text-[rgb(var(--muted))]">No hay sueno registrado para {previousDateLabel}.</p>
       )}
-    </CompactDisclosure>
+    </Card>
   );
 }
 

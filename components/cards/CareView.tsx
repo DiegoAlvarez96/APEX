@@ -55,7 +55,7 @@ export function CareView({ photos, onAddPhoto }: { photos: ProgressPhoto[]; onAd
                   <p className="font-medium">{product.order}. {product.name}</p>
                   <p className="text-xs text-white/40 light:text-black/40">{product.waitMinutes ? `Esperar ${product.waitMinutes} minutos` : "Aplicacion directa"}</p>
                 </div>
-                <span className="rounded-full bg-limeglass/15 px-3 py-1 text-xs text-limeglass light:text-black">Activo</span>
+                <span className="rounded-full bg-[rgba(var(--module-accent),0.15)] px-3 py-1 text-xs text-[rgb(var(--module-accent))]">Activo</span>
               </div>
             ))}
           </div>
@@ -74,7 +74,7 @@ export function CareView({ photos, onAddPhoto }: { photos: ProgressPhoto[]; onAd
       <Card>
         <SectionTitle eyebrow="Offline" title="Fotos de progreso" />
         <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed border-white/20 bg-white/[0.04] text-center light:border-black/15 light:bg-black/[0.03]">
-          <Camera className="mb-2 text-limeglass" />
+          <Camera className="mb-2 text-[rgb(var(--module-accent))]" />
           <span className="text-sm font-medium">Agregar foto de {tabMeta[tab].label.toLowerCase()}</span>
           <input className="hidden" type="file" accept="image/*" onChange={(event) => void handlePhoto(event.target.files?.[0] ?? null)} />
         </label>

@@ -42,7 +42,7 @@ export function TrainingView({
             </select>
           </div>
           <textarea className="min-h-36 rounded-3xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" value={rawExercises} onChange={(event) => setRawExercises(event.target.value)} />
-          <button className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" onClick={submit} type="button">
+          <button className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[rgb(var(--module-accent))] font-semibold text-[rgb(var(--bg))]" onClick={submit} type="button">
             <Plus size={18} /> Guardar entrenamiento
           </button>
         </div>
@@ -53,7 +53,7 @@ export function TrainingView({
           <Card key={workout.id} className="p-4">
             <div className="flex items-start gap-3">
               <div className="grid size-11 place-items-center rounded-2xl bg-white/[0.08] light:bg-black/[0.05]">
-                <Dumbbell className="text-limeglass" size={20} />
+                <Dumbbell className="text-[rgb(var(--module-accent))]" size={20} />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">{workout.title}</p>

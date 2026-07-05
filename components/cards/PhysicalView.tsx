@@ -141,7 +141,7 @@ export function PhysicalView({
           ))}
         </div>
         <textarea className="mt-3 min-h-24 w-full rounded-3xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" placeholder="Notas de la medicion" value={value.notes ?? ""} onChange={(event) => setValue((current) => ({ ...current, notes: event.target.value }))} />
-        <LoadingButton loading={saving} loadingLabel="Guardando..." className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" onClick={() => void save()}>
+        <LoadingButton loading={saving} loadingLabel="Guardando..." className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[rgb(var(--module-accent))] font-semibold text-[rgb(var(--bg))]" onClick={() => void save()}>
           <Save size={18} /> {editing ? "Guardar cambios" : "Guardar medicion"}
         </LoadingButton>
         {editing ? <button className="mt-2 h-10 w-full rounded-2xl bg-white/[0.08] text-sm light:bg-black/[0.05]" type="button" onClick={() => setEditing(undefined)}>Cancelar edicion</button> : null}

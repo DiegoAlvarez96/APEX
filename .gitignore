@@ -9,8 +9,10 @@ build
 
 dev-server.log
 dev-server.err.log
-next-3005.*.log
+next-*.log
+.next-dev.log
 local-prod-*.log
+preview-server.log
 *.tsbuildinfo
 lib/generated/prisma
 public/sw.js

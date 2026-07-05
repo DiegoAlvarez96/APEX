@@ -10,6 +10,11 @@ export type FinanceTransactionType = "expense" | "income";
 export type FinanceCurrency = "ARS" | "USD" | "EUR" | "BRL" | "CLP" | "UYU" | "MXN" | "COP" | "PEN" | "GBP";
 export type FinancePaymentKind = "cash" | "transfer" | "debit" | "credit" | "wallet" | "app";
 export type FinanceRangeMode = "day" | "week" | "month" | "custom";
+export type SportCategory = "strength" | "running" | "cycling" | "swimming" | "snow" | "martial" | "team" | "racket" | "outdoor" | "water" | "gymnastics" | "wellness" | "rhythm" | "precision" | "other";
+export type SportEventType = "training" | "competition";
+export type SportGoal = "hobby" | "amateur" | "professional";
+export type SportMode = "card_only" | "custom_training";
+export type SportStatus = "active" | "paused";
 
 export type RoutineTask = {
   id: string;
@@ -202,6 +207,32 @@ export type WorkoutTemplate = {
   exercises: WorkoutExercise[];
   notes?: string;
   source: "default" | "user" | "ai";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SportSchedule = {
+  id: string;
+  weekday: number;
+  startTime: string;
+  endTime: string;
+  type: SportEventType;
+};
+
+export type SportProfile = {
+  id?: number;
+  name: string;
+  category: SportCategory;
+  specification: string;
+  customCategory?: string;
+  customSpecification?: string;
+  hasFixedSchedule: boolean;
+  schedules: SportSchedule[];
+  goal: SportGoal;
+  mode: SportMode;
+  status: SportStatus;
+  accent: string;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 };

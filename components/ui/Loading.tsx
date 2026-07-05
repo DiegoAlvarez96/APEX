@@ -34,7 +34,7 @@ export function InlineStatus({ message, tone = "info" }: { message?: string; ton
   if (!message) return null;
   const toneClass = {
     info: "bg-white/[0.08] text-white/65 light:bg-black/[0.05] light:text-black/65",
-    success: "bg-limeglass/15 text-limeglass light:text-black",
+    success: "bg-[rgba(var(--module-accent),0.15)] text-[rgb(var(--module-accent))]",
     error: "bg-red-500/15 text-red-200 light:text-red-700"
   }[tone];
   return <p className={`rounded-2xl p-3 text-center text-sm ${toneClass}`}>{message}</p>;

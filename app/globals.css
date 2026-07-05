@@ -4,23 +4,28 @@
 
 :root {
   color-scheme: dark;
-  --bg: 9 10 12;
-  --surface: 24 25 29;
-  --surface-strong: 32 34 39;
+  --bg: 5 7 12;
+  --surface: 18 20 27;
+  --surface-strong: 27 30 39;
   --text: 248 250 252;
-  --muted: 148 157 171;
-  --border: 55 59 67;
-  --accent: 216 255 100;
-  --accent-2: 94 234 212;
-  --danger: 255 111 97;
+  --muted: 158 166 180;
+  --border: 62 69 83;
+  --accent: 181 231 138;
+  --accent-2: 125 211 252;
+  --danger: 248 113 113;
   --nutrition: 130 214 151;
-  --training: 238 159 103;
+  --training: 190 242 100;
   --agenda: 111 174 232;
   --ai: 178 143 232;
-  --tasks: 112 220 214;
-  --finance: 232 197 98;
-  --health: 234 126 126;
-  --habits: 185 149 111;
+  --tasks: 166 213 232;
+  --finance: 38 189 139;
+  --health: 91 213 214;
+  --habits: 244 177 96;
+  --sleep: 139 124 246;
+  --routine: 147 197 253;
+  --settings: 170 176 188;
+  --profile: 96 165 250;
+  --module-accent: var(--accent-2);
   --background: rgb(var(--bg));
   --foreground: rgb(var(--text));
 }
@@ -37,13 +42,18 @@
   --accent-2: 0 138 128;
   --danger: 210 78 68;
   --nutrition: 77 161 103;
-  --training: 204 112 60;
+  --training: 101 163 13;
   --agenda: 58 126 194;
   --ai: 137 103 202;
-  --tasks: 41 158 153;
-  --finance: 190 145 42;
-  --health: 204 82 82;
-  --habits: 140 101 67;
+  --tasks: 70 160 180;
+  --finance: 5 150 105;
+  --health: 14 165 166;
+  --habits: 220 124 45;
+  --sleep: 109 88 196;
+  --routine: 37 99 235;
+  --settings: 99 107 121;
+  --profile: 37 99 235;
+  --module-accent: var(--accent-2);
   --background: rgb(var(--bg));
   --foreground: rgb(var(--text));
 }
@@ -61,7 +71,12 @@ body {
   min-height: 100%;
   margin: 0;
   overflow-x: hidden;
-  background: var(--background);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 50% -18%, rgba(var(--module-accent), 0.10), transparent 34%),
+    radial-gradient(circle at 8% 28%, rgba(var(--ai), 0.08), transparent 24%),
+    radial-gradient(circle at 94% 82%, rgba(var(--agenda), 0.08), transparent 24%),
+    var(--background);
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -85,15 +100,67 @@ textarea {
 }
 
 .glass {
-  border: 1px solid rgb(var(--border));
-  background: rgba(var(--surface), 0.86);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background:
+    radial-gradient(circle at 24% 0%, rgba(var(--module-accent), 0.14), transparent 38%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(var(--surface), 0.76) 54%),
+    rgba(var(--surface), 0.76);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
 }
 
 .light .glass {
-  background: rgba(255, 255, 255, 0.86);
+  background:
+    linear-gradient(145deg, rgba(var(--module-accent), 0.08), rgba(255, 255, 255, 0.88) 42%),
+    rgba(255, 255, 255, 0.86);
+}
+
+.module-soft-surface {
+  border-color: rgba(255, 255, 255, 0.10);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(var(--module-accent), 0.14), transparent 38%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.065), rgba(var(--surface), 0.78) 52%),
+    rgba(var(--surface), 0.86);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.module-action {
+  background: rgb(var(--module-accent));
+  color: rgb(var(--bg));
+}
+
+.apex-shell {
+  background-attachment: fixed;
+}
+
+.apex-card {
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(var(--module-accent), 0.13), transparent 38%),
+    rgba(var(--surface), 0.74);
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.apex-icon {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(var(--module-accent), 0.22);
+  background:
+    radial-gradient(circle at 35% 20%, rgba(255, 255, 255, 0.26), transparent 30%),
+    rgba(var(--module-accent), 0.16);
+  color: rgb(var(--module-accent));
+}
+
+.apex-action {
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.28), transparent 26%),
+    linear-gradient(135deg, rgba(var(--module-accent), 0.94), rgba(var(--module-accent), 0.70));
+  color: rgb(var(--bg));
+  box-shadow: 0 14px 36px rgba(var(--module-accent), 0.20);
 }
 
 .safe-bottom {

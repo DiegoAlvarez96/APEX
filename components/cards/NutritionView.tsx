@@ -59,7 +59,7 @@ export function NutritionView({
             <Field label="Grasas g" name="fat" register={register} />
             <Field label="Agua ml" name="waterMl" register={register} />
           </div>
-          <button className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" type="submit">
+          <button className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[rgb(var(--module-accent))] font-semibold text-[rgb(var(--bg))]" type="submit">
             <Save size={18} /> Guardar dia
           </button>
         </form>

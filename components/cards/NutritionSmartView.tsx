@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, Check, Copy, Eye, Plus, Search, Trash2, X } from "lucide-react";
+import { Camera, Check, Copy, Eye, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CompactDisclosure } from "@/components/ui/CompactDisclosure";
 import { DateNavigator } from "@/components/ui/DateNavigator";
@@ -47,6 +47,8 @@ export function NutritionSmartView({
   const [status, setStatus] = useState<{ message?: string; tone?: "info" | "success" | "error" }>({});
   const [selectedFood, setSelectedFood] = useState<FoodEntry>();
   const [editingFood, setEditingFood] = useState<FoodEntry>();
+  const [editingPlan, setEditingPlan] = useState<{ item: NutritionPlanItem; text: string }>();
+  const [recalculatingPlanIds, setRecalculatingPlanIds] = useState<string[]>([]);
   const [visionConfirm, setVisionConfirm] = useState<{ options: FoodVisionOption[]; foods?: FoodEntry[]; other: string }>();
   const [defaultConfirm, setDefaultConfirm] = useState<{ entry: FoodEntry; original: string }>();
   const totals = useMemo(() => calculateNutritionTotals(meals, planItems, drinks), [drinks, meals, planItems]);
@@ -61,6 +63,8 @@ export function NutritionSmartView({
     setDrinks(nutrition?.drinks ?? []);
     setSelectedFood(undefined);
     setEditingFood(undefined);
+    setEditingPlan(undefined);
+    setRecalculatingPlanIds([]);
   }, [nutrition, selectedDateKey]);
 
   async function autosave(nextMeals = meals, nextPlan = planItems, nextDrinks = drinks, nextWeight = weightKg) {
@@ -230,6 +234,51 @@ export function NutritionSmartView({
     await autosave(meals, nextPlan, drinks);
   }
 
+  function openPlanEditor(item: NutritionPlanItem) {
+    setEditingPlan({ item, text: planItemEditableText(item) });
+  }
+
+  async function closePlanEditor() {
+    if (!editingPlan) return;
+    const draftText = editingPlan.text.trim();
+    const currentItem = planItems.find((item) => item.id === editingPlan.item.id);
+    setEditingPlan(undefined);
+    if (!currentItem || !draftText || draftText === planItemEditableText(currentItem).trim()) return;
+
+    const draftedItem = applyPlanText(currentItem, draftText);
+    const nextPlan = planItems.map((item) => item.id === draftedItem.id ? draftedItem : item);
+    setPlanItems(nextPlan);
+    setRecalculatingPlanIds((current) => current.includes(draftedItem.id) ? current : [...current, draftedItem.id]);
+    await autosave(meals, nextPlan, drinks);
+    await recalculatePlanItem(draftedItem, draftText, nextPlan);
+  }
+
+  async function recalculatePlanItem(item: NutritionPlanItem, detail: string, basePlan: NutritionPlanItem[]) {
+    setRecalculatingPlanIds((current) => current.includes(item.id) ? current : [...current, item.id]);
+    setStatus({ message: "Calculando macros de la comida...", tone: "info" });
+    try {
+      const food = await onEstimateFood(detail);
+      const nextItem: NutritionPlanItem = {
+        ...item,
+        name: food.name || item.name,
+        amountLabel: food.amountLabel ?? item.amountLabel,
+        calories: food.calories,
+        protein: food.protein,
+        carbs: food.carbs,
+        fat: food.fat,
+        fiber: food.fiber
+      };
+      const nextPlan = basePlan.map((planItem) => planItem.id === item.id ? nextItem : planItem);
+      setPlanItems(nextPlan);
+      await autosave(meals, nextPlan, drinks);
+      setStatus({ message: "Macros actualizados.", tone: "success" });
+    } catch (error) {
+      handleFoodEstimateError(error, detail);
+    } finally {
+      setRecalculatingPlanIds((current) => current.filter((id) => id !== item.id));
+    }
+  }
+
   async function updateFood(food: FoodEntry) {
     const nextMeals = meals.map((meal) => meal.id === food.id ? food : meal);
     setMeals(nextMeals);
@@ -282,32 +331,58 @@ export function NutritionSmartView({
           <div key={meal} className="mb-4 last:mb-0">
             <p className="mb-2 text-sm font-semibold">{meal}</p>
             <div className="space-y-2">
-              {planItems.filter((item) => item.meal === meal).map((item) => (
-                <button
-                  key={item.id}
-                  className={`flex w-full items-start gap-3 rounded-2xl px-3 py-2 text-left text-sm ${item.done ? "bg-limeglass text-black" : "bg-white/[0.06] light:bg-black/[0.04]"}`}
-                  onClick={() => void togglePlan(item.id)}
-                  disabled={loading === "autosave"}
-                  type="button"
-                >
-                  <Check className="mt-0.5 shrink-0" size={16} />
-                  <span className="min-w-0">
-                    <span className="block font-medium">{item.name}{item.amountLabel ? ` - ${item.amountLabel}` : ""}</span>
-                    {item.components?.length ? (
-                      <span className={`mt-1 block text-xs leading-5 ${item.done ? "text-black/65" : "text-white/45 light:text-black/45"}`}>
-                        {item.components.map((component) => `${component.name} ${component.amountLabel}`).join(" + ")}
-                      </span>
-                    ) : null}
-                    {item.notes ? <span className={`mt-1 block text-xs leading-5 ${item.done ? "text-black/55" : "text-white/40 light:text-black/40"}`}>{item.notes}</span> : null}
-                  </span>
-                </button>
-              ))}
+              {planItems.filter((item) => item.meal === meal).map((item) => {
+                const isRecalculating = recalculatingPlanIds.includes(item.id);
+                const mutedText = item.done ? "text-black/65" : "text-white/45 light:text-black/45";
+                return (
+                  <div
+                    key={item.id}
+                    className={`relative flex w-full items-start gap-3 rounded-2xl px-3 py-2 pr-11 text-left text-sm transition ${item.done ? "bg-[rgb(var(--module-accent))] text-[rgb(var(--bg))]" : "bg-white/[0.06] light:bg-black/[0.04]"}`}
+                  >
+                    <button
+                      className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-white/10 light:bg-black/5"
+                      onClick={() => void togglePlan(item.id)}
+                      disabled={loading === "autosave"}
+                      type="button"
+                      aria-label={item.done ? "Marcar comida pendiente" : "Marcar comida hecha"}
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button className="min-w-0 flex-1 text-left" onClick={() => void togglePlan(item.id)} disabled={loading === "autosave"} type="button">
+                      <span className="block font-medium">{item.name}{item.amountLabel ? ` - ${item.amountLabel}` : ""}</span>
+                      {item.components?.length ? (
+                        <span className={`mt-1 block text-xs leading-5 ${mutedText}`}>
+                          {item.components.map((component) => `${component.name} ${component.amountLabel}`).join(" + ")}
+                        </span>
+                      ) : null}
+                      {item.notes ? <span className={`mt-1 block text-xs leading-5 ${item.done ? "text-black/55" : "text-white/40 light:text-black/40"}`}>{item.notes}</span> : null}
+                      {isRecalculating ? (
+                        <span className={`mt-2 flex items-center gap-1.5 text-xs ${mutedText}`}>
+                          <Loader2 className="animate-spin" size={13} /> Calculando macros
+                        </span>
+                      ) : (
+                        <span className={`mt-2 block text-xs ${mutedText}`}>
+                          {Math.round(item.calories ?? 0)} kcal - P {Math.round(item.protein ?? 0)} g - C {Math.round(item.carbs ?? 0)} g - G {Math.round(item.fat ?? 0)} g
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      className={`absolute right-2 top-2 grid size-8 place-items-center rounded-full ${item.done ? "bg-black/10 text-black/70" : "bg-white/[0.08] text-white/65 light:bg-black/[0.05] light:text-black/65"}`}
+                      onClick={() => openPlanEditor(item)}
+                      type="button"
+                      aria-label="Editar comida del plan"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))}
       </CompactDisclosure>
 
-      <CompactDisclosure title="Agregar comidas" defaultOpen>
+      <CompactDisclosure title="Agregar comidas">
         <div className="-mx-1 -mt-1 mb-2">
           <SegmentedControl value={mode} onChange={setMode} options={[{ value: "text", label: "Nuevo" }, { value: "search", label: "Buscar" }, { value: "photo", label: "Foto" }]} />
         </div>
@@ -336,7 +411,7 @@ export function NutritionSmartView({
         ) : null}
         {mode === "photo" ? (
           <label className="flex min-h-28 w-full cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed border-white/20 bg-white/[0.04] light:border-black/15 light:bg-black/[0.03]">
-            <Camera className="mb-2 text-limeglass" /> Tomar o seleccionar foto
+            <Camera className="mb-2 text-[rgb(var(--module-accent))]" /> Tomar o seleccionar foto
             <span className="mt-1 text-xs text-white/45 light:text-black/45">{loading === "photo" ? "Analizando imagen..." : "Si hay duda, APEX pide confirmacion antes de guardar."}</span>
             <input className="hidden" type="file" accept="image/*" capture="environment" onChange={(event) => void handlePhoto(event.target.files?.[0] ?? null)} />
           </label>
@@ -432,8 +507,28 @@ export function NutritionSmartView({
                 </button>
               ))}
               <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" placeholder="Otro..." value={visionConfirm.other} onChange={(event) => setVisionConfirm((current) => current ? { ...current, other: event.target.value } : current)} />
-              <LoadingButton loading={loading === "food"} loadingLabel="Calculando..." className="h-11 rounded-2xl bg-limeglass font-semibold text-black" onClick={() => void confirmPhotoFood("Otro")}>Usar otro</LoadingButton>
+              <LoadingButton loading={loading === "food"} loadingLabel="Calculando..." className="h-11 rounded-2xl bg-[rgb(var(--module-accent))] font-semibold text-[rgb(var(--bg))]" onClick={() => void confirmPhotoFood("Otro")}>Usar otro</LoadingButton>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {editingPlan ? (
+        <div className="fixed inset-0 z-[72] grid place-items-end bg-black/60 p-4 sm:place-items-center" onMouseDown={() => void closePlanEditor()}>
+          <div className="w-full max-w-md rounded-[28px] bg-[#101114] p-5 shadow-2xl light:bg-white" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-white/45 light:text-black/45">Editar plan</p>
+                <h2 className="text-xl font-semibold">{editingPlan.item.meal}</h2>
+              </div>
+              <button className="grid size-9 place-items-center rounded-full bg-white/[0.08] light:bg-black/[0.05]" type="button" onClick={() => void closePlanEditor()} aria-label="Cerrar editor"><X size={16} /></button>
+            </div>
+            <textarea
+              className="min-h-44 w-full resize-none rounded-2xl bg-white/[0.08] px-4 py-3 text-sm leading-6 outline-none light:bg-black/[0.05]"
+              autoFocus
+              value={editingPlan.text}
+              onChange={(event) => setEditingPlan((current) => current ? { ...current, text: event.target.value } : current)}
+            />
           </div>
         </div>
       ) : null}
@@ -457,7 +552,7 @@ export function NutritionSmartView({
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button className="h-11 rounded-2xl bg-white/[0.08] text-sm light:bg-black/[0.05]" type="button" onClick={rejectDefaultFood}>Cancelar</button>
-              <LoadingButton loading={loading === "autosave"} loadingLabel="Guardando..." className="h-11 rounded-2xl bg-limeglass text-sm font-semibold text-black" onClick={() => void acceptDefaultFood()}>Cargar defaults</LoadingButton>
+              <LoadingButton loading={loading === "autosave"} loadingLabel="Guardando..." className="h-11 rounded-2xl bg-[rgb(var(--module-accent))] text-sm font-semibold text-[rgb(var(--bg))]" onClick={() => void acceptDefaultFood()}>Cargar defaults</LoadingButton>
             </div>
           </div>
         </div>
@@ -504,7 +599,7 @@ function FoodDetail({
           {(["name", "calories", "protein", "carbs", "fat", "fiber"] as const).map((key) => (
             <input key={key} className="rounded-2xl bg-white/[0.08] px-3 py-2 outline-none light:bg-black/[0.05]" value={String(draft[key])} type={key === "name" ? "text" : "number"} onChange={(event) => onChange({ ...draft, [key]: key === "name" ? event.target.value : Number(event.target.value), calculationMethod: "manual" })} />
           ))}
-          <button className="col-span-2 h-10 rounded-2xl bg-limeglass font-semibold text-black" onClick={() => onSave(draft)} type="button">Guardar alimento</button>
+          <button className="col-span-2 h-10 rounded-2xl bg-[rgb(var(--module-accent))] font-semibold text-[rgb(var(--bg))]" onClick={() => onSave(draft)} type="button">Guardar alimento</button>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
@@ -530,4 +625,30 @@ function buildFrequentFoods(meals: FoodEntry[], query: string) {
     .map(([name]) => name)
     .filter((name) => !normalized || name.toLowerCase().includes(normalized))
     .slice(0, 10);
+}
+
+function planItemEditableText(item: NutritionPlanItem) {
+  const lines = [item.name];
+  if (item.amountLabel) lines[0] = `${lines[0]} - ${item.amountLabel}`;
+  if (item.components?.length) lines.push(item.components.map((component) => `${component.name} ${component.amountLabel}`).join(" + "));
+  if (item.notes) lines.push(item.notes);
+  return lines.filter(Boolean).join("\n");
+}
+
+function applyPlanText(item: NutritionPlanItem, text: string): NutritionPlanItem {
+  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const firstLine = lines[0] ?? item.name;
+  const [namePart, amountPart] = firstLine.split(/\s+-\s+/, 2);
+  return {
+    ...item,
+    name: namePart.trim() || item.name,
+    amountLabel: amountPart?.trim() || undefined,
+    components: undefined,
+    notes: lines.slice(1).join("\n") || undefined,
+    calories: undefined,
+    protein: undefined,
+    carbs: undefined,
+    fat: undefined,
+    fiber: undefined
+  };
 }

@@ -24,7 +24,7 @@ export function TimelineView({ events }: { events: TimelineEvent[] }) {
           <div className="space-y-3">
             {items.map((event) => (
               <div key={event.id} className="flex gap-3">
-                {event.type === "training" ? <CheckCircle2 className="text-limeglass" size={20} /> : <CircleDot className="text-white/35 light:text-black/35" size={20} />}
+                {event.type === "training" ? <CheckCircle2 className="text-[rgb(var(--module-accent))]" size={20} /> : <CircleDot className="text-white/35 light:text-black/35" size={20} />}
                 <div>
                   <p className="text-sm font-medium">{event.title}</p>
                   {event.detail ? <p className="text-xs text-white/45 light:text-black/45">{event.detail}</p> : null}

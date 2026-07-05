@@ -1,19 +1,32 @@
 "use client";
 
 import { Bell, Download, Moon, Sun, type LucideIcon } from "lucide-react";
+import { SportSettingsPanel } from "@/components/cards/SportSettingsPanel";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { dateKey } from "@/lib/date";
 import { enabledModules } from "@/lib/modules";
-import type { AppSettings } from "@/types/apex";
+import type { AppSettings, SportProfile } from "@/types/apex";
 
 export function SettingsView({
   settings,
   onUpdateSettings,
-  onExport
+  onExport,
+  sportProfiles,
+  onAddSportProfile,
+  onUpdateSportProfile,
+  onDeleteSportProfile,
+  onDuplicateSportProfile,
+  onOpenAgenda
 }: {
   settings: AppSettings;
   onUpdateSettings: (settings: Partial<AppSettings>) => void;
   onExport: () => Promise<string>;
+  sportProfiles: SportProfile[];
+  onAddSportProfile: (profile: Omit<SportProfile, "id" | "createdAt" | "updatedAt">) => Promise<void> | void;
+  onUpdateSportProfile: (id: number, profile: Partial<SportProfile>) => Promise<void> | void;
+  onDeleteSportProfile: (id: number, mode: "future" | "all") => Promise<void> | void;
+  onDuplicateSportProfile: (profile: SportProfile) => Promise<void> | void;
+  onOpenAgenda: () => void;
 }) {
   async function enableNotifications() {
     if (!("Notification" in window)) return;
@@ -70,9 +83,20 @@ export function SettingsView({
         </div>
       </Card>
 
+      <Card className="p-4">
+        <SportSettingsPanel
+          sports={sportProfiles}
+          onAdd={onAddSportProfile}
+          onUpdate={onUpdateSportProfile}
+          onDelete={onDeleteSportProfile}
+          onDuplicate={onDuplicateSportProfile}
+          onOpenAgenda={onOpenAgenda}
+        />
+      </Card>
+
       <Card>
         <SectionTitle title="Backup local" />
-        <button className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" onClick={() => void exportBackup()} type="button">
+        <button className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[rgb(var(--module-accent))] font-semibold text-[rgb(var(--bg))]" onClick={() => void exportBackup()} type="button">
           <Download size={18} /> Exportar datos
         </button>
       </Card>
@@ -130,10 +154,10 @@ function SettingRow({
   return (
     <button type="button" disabled={disabled} onClick={onToggle} className="flex min-h-14 w-full items-center justify-between gap-3 rounded-2xl px-3 text-left disabled:opacity-80">
       <span className="flex items-center gap-3">
-        <Icon size={18} className="text-[rgb(var(--accent-2))]" />
+        <Icon size={18} className="text-[rgb(var(--module-accent))]" />
         <span className="text-sm font-medium">{label}</span>
       </span>
-      <span className={`relative h-8 w-[52px] rounded-full transition ${value ? "bg-[rgb(var(--accent))]" : "bg-[rgb(var(--surface-strong))]"}`}>
+      <span className={`relative h-8 w-[52px] rounded-full transition ${value ? "bg-[rgb(var(--module-accent))]" : "bg-[rgb(var(--surface-strong))]"}`}>
         <span className={`absolute top-1 size-6 rounded-full bg-white shadow-sm transition ${value ? "left-6" : "left-1"}`} />
       </span>
     </button>

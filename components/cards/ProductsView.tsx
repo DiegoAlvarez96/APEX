@@ -58,7 +58,7 @@ export function ProductsView({
             <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" type="date" {...register("purchaseDate")} />
             <input className="rounded-2xl bg-white/[0.08] px-4 py-3 outline-none light:bg-black/[0.05]" type="number" placeholder="Costo" {...register("cost")} />
           </div>
-          <button className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-limeglass font-semibold text-black" type="submit">
+          <button className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[rgb(var(--module-accent))] font-semibold text-[rgb(var(--bg))]" type="submit">
             <Plus size={18} /> Guardar
           </button>
         </form>
@@ -78,7 +78,7 @@ export function ProductsView({
               </div>
               <div className="mt-4 flex items-center gap-3">
                 <input
-                  className="h-2 flex-1 accent-limeglass"
+                  className="h-2 flex-1 accent-[rgb(var(--module-accent))]"
                   type="range"
                   min={0}
                   max={Math.max(product.quantity, 100)}
